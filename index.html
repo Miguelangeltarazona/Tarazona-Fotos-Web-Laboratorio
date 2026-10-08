@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f3ec">
+<meta name="description" content="Tarazona Fotos: fototeca privada de la Falla Raval d’Alcàsser, con álbumes, fotografías, eventos, recuerdos y descargas.">
+<title>Tarazona Fotos · V26 APPWRITE LABORATORIO</title>
+<!-- TARAZONA FOTOS V26-APPWRITE-LABORATORIO -->
+<!-- Tarazona Fotos V26 — Appwrite + Dropbox -->
+<link rel="stylesheet" href="style.css">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://cdn.jsdelivr.net/npm/appwrite@27.0.0"></script>
+<script src="appwrite-adapter.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style id="tf-v13-enhancements">
+body.dark-mode{background:#171412!important;color:#f5efe8!important}
+body.dark-mode .topbar,body.dark-mode .sidebar,body.dark-mode .bottom,body.dark-mode .panel,body.dark-mode .card,body.dark-mode .hero,body.dark-mode .private,body.dark-mode .locked-card,body.dark-mode .notice,body.dark-mode .account-card,body.dark-mode .sheet,body.dark-mode input,body.dark-mode textarea,body.dark-mode select,body.dark-mode .person-card,body.dark-mode .message-users,body.dark-mode .message-pane,body.dark-mode .event-card,body.dark-mode .place-card{background:#211c19!important;color:#f5efe8!important;border-color:#463b35!important}
+body.dark-mode .muted,body.dark-mode p,body.dark-mode small{color:#c9beb5!important}
+body.dark-mode .admin-item,body.dark-mode .admin-photo{border-color:#463b35!important}
+.theme-toggle{display:inline-flex;align-items:center;gap:8px}
+</style>
+
+<style id="tf-v22-final-fixes">
+/* V22 — menú lateral claramente fuera de la portada */
+.menu-toggle{top:var(--tf-menu-top,320px)!important;bottom:auto!important;position:fixed!important}
+@media(max-width:700px){.menu-toggle{right:14px;width:50px;height:50px}}
+@media(min-width:701px) and (max-width:1000px){.menu-toggle{right:16px}}
+@media(min-width:1001px){.menu-toggle{right:24px}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="brand" onclick="goHome()" aria-label="Ir a inicio"><span class="brand-mark">TF</span><span class="brand-name">Tarazona<small>FOTOS</small></span></button>
+  <div class="top-actions"><button id="accountBtn" class="header-btn" onclick="accountRoute()">Entrar</button></div>
+</header>
+<div class="site-banner"><img id="siteBannerImg" src="tarazona-header.jpg" alt="Tarazona Fotos — Fallas, gente, momentos"><div class="lab-badge" aria-label="Versión de laboratorio">LABORATORIO</div></div>
+<aside class="sidebar" aria-label="Menú principal">
+  <div class="side-title">TARAZONA <span>FOTOS</span></div>
+  <nav class="side-nav">
+    <button onclick="goHome();closeSide()"><span>⌂</span>Inicio</button>
+    <button onclick="albums();closeSide()"><span>▦</span>Álbumes</button>
+    <button onclick="calendarPage();closeSide()"><span>◷</span>Calendario</button>
+    <button onclick="placesPage();closeSide()"><span>⌖</span>Lugares</button>
+    <button onclick="favorites();closeSide()"><span>♡</span>Favoritos</button>
+    <button onclick="myCommentsPage();closeSide()"><span>💬</span>Comentarios</button>
+    <button id="themeMenuBtn" onclick="toggleUserTheme();closeSide()"><span>🌙</span><span id="themeMenuLabel">Modo oscuro</span></button>
+    <button onclick="downloads();closeSide()"><span>↓</span>Descargas</button>
+    <button onclick="notifications();closeSide()"><span>♢</span>Notificaciones</button>
+    <button onclick="peoplePage();closeSide()"><span>♙</span>Personas</button>
+    <button onclick="messagesPage();closeSide()"><span>✉</span>Mensajes</button>
+    <button onclick="searchPage();closeSide()"><span>⌕</span>Buscar</button>
+    <button onclick="aboutPage();closeSide()"><span>ⓘ</span>Sobre nosotros</button>
+    <button onclick="requestsPage();closeSide()"><span>⚑</span>Solicitudes</button>
+    <button onclick="openRadio();closeSide()"><span>♪</span>KISS FM en directo</button>
+    <button onclick="contactPage();closeSide()"><span>✆</span>Contacto</button>
+    <button id="adminNav" class="admin-nav" onclick="admin();closeSide()" style="display:none"><span>⚙</span>Administración</button>
+  </nav>
+  <div class="side-bottom"><button onclick="accountRoute();closeSide()"><span>◯</span>Mi cuenta</button></div>
+</aside>
+<div id="sideBackdrop" class="side-backdrop" onclick="closeSide()"></div>
+<button class="menu-toggle" onclick="toggleSide()" aria-label="Abrir menú">☰</button>
+<main id="app" aria-live="polite"></main>
+<nav class="bottom" aria-label="Navegación principal">
+  <button id="bottomHomeBtn" type="button" onclick="goHome()"><span>⌂</span><small>Inicio</small></button>
+  <button onclick="albums()"><span>▦</span><small>Álbumes</small></button>
+  <button onclick="accountRoute()"><span>◯</span><small>Mi cuenta</small></button>
+</nav>
+<div id="modal" class="modal hide" onclick="if(event.target===this)closeM()">
+  <div class="sheet"><button class="x" onclick="closeM()" aria-label="Cerrar">×</button><div id="body"></div></div>
+</div>
+<div id="toast" class="toast" role="status"></div>
+<script>
+const APPWRITE_ENDPOINT='https://fra.cloud.appwrite.io/v1';
+const APPWRITE_PROJECT_ID='6ac131aa0027074df282';
+const sb=window.sb;
+const app=document.getElementById('app'), modal=document.getElementById('modal'), body=document.getElementById('body'), accountBtn=document.getElementById('accountBtn');
+let albumCache=[], siteSettings=null, siteSettingsAt=0, albumStatsCache=new Map(), albumStatsAt=0, viewerZoom=1, activeMessageUser=null, messagePolling=null;
+let cachedUser=null, authStateReady=false, authInitPromise=null;
+const profileCache=new Map(), profileCacheAt=new Map(), themeCache=new Map(), themeCacheAt=new Map();
+const mediaCache=new Map();
+
+sb.auth.onAuthStateChange((event,session)=>{
+  cachedUser=session?.user||null;
+  authStateReady=true;
+  authInitPromise=null;
+  if(event==='PASSWORD_RECOVERY')setTimeout(()=>openNewPassword(),50);
+  // Refresh the UI without blocking authentication callbacks.
+  if(typeof refreshHeader==='function')setTimeout(()=>refreshHeader().catch(()=>{}),0);
+});
+function openNewPassword(){body.innerHTML=`<div class="modal-head"><label>TARAZONA FOTOS</label><h2>Cambiar contraseña</h2><p>Escribe tu nueva contraseña.</p></div>${passwordInput('newPass','new-password','Nueva contraseña (mínimo 8 caracteres)')}${passwordInput('newPass2','new-password','Repite la nueva contraseña')}<button class="cta full" onclick="saveNewPassword()">Guardar nueva contraseña</button>`;modal.classList.remove('hide');setTimeout(()=>document.getElementById('newPass')?.focus(),80)}
+async function saveNewPassword(){const p1=document.getElementById('newPass')?.value||'',p2=document.getElementById('newPass2')?.value||'';if(p1.length<8)return toast('La contraseña debe tener al menos 8 caracteres.');if(p1!==p2)return toast('Las dos contraseñas no coinciden.');const {error}=await sb.auth.updateUser({password:p1});if(error)return toast(error.message);body.innerHTML=`<div class="success"><div>✅</div><h2>Contraseña actualizada</h2><p>Ya puedes entrar con tu nueva contraseña.</p><button class="cta" onclick="closeM();accountRoute()">Continuar</button></div>`}
+
+const fallbackSite={site_name:'Tarazona Fotos',hero_title:'Los momentos que merecen quedarse.',hero_subtitle:'Las fotos de nuestra falla, organizadas por años y eventos para que puedas encontrarlas, descargarlas y conservarlas.',about_text:'Tarazona Fotos es la fototeca privada de la Falla Raval d’Alcàsser.',contact_email:'',accent_color:'#08bfc0',welcome_text:'Fallas, gente, momentos... ¡y mucho más!'};
+
+function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(window._toast);window._toast=setTimeout(()=>t.classList.remove('show'),2800)}
+function dateLabel(v){if(!v)return 'Archivo';const d=new Date(String(v).length<=10?v+'T12:00:00':v);return isNaN(d)?String(v):d.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});}
+function formatBytes(n){n=Number(n)||0;if(!n)return '0 B';const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return `${n.toFixed(i?1:0)} ${u[i]}`}
+function coverClass(i=0){return `cover c${Math.abs(i)%6}`}
+async function currentUser(){
+  if(authStateReady)return cachedUser;
+  if(!authInitPromise){
+    authInitPromise=sb.auth.getSession().then(({data})=>{
+      cachedUser=data?.session?.user||null;
+      authStateReady=true;
+      return cachedUser;
+    }).catch(()=>{authStateReady=true;cachedUser=null;return null});
+  }
+  return authInitPromise;
+}
+async function functionAuthHeaders(){const {data,error}=await sb.auth.getSession();if(error||!data?.session)return null;return {};}
+async function getCachedProfile(userId,fields='full_name,role,avatar_path'){
+  if(!userId)return null;
+  const now=Date.now(), stamp=profileCacheAt.get(userId)||0, hit=profileCache.get(userId);
+  if(hit&&now-stamp<120000)return hit;
+  try{const {data}=await sb.from('profiles').select(fields).eq('id',userId).maybeSingle();if(data){profileCache.set(userId,data);profileCacheAt.set(userId,now);return data;}}catch(e){}
+  return hit||null;
+}
+function toggleSide(){document.querySelector('.sidebar')?.classList.toggle('open');document.getElementById('sideBackdrop')?.classList.toggle('open')}
+function closeSide(){document.querySelector('.sidebar')?.classList.remove('open');document.getElementById('sideBackdrop')?.classList.remove('open')}
+function closeM(){modal.classList.add('hide');viewerZoom=1}
+function applyAccent(hex){if(/^#[0-9a-fA-F]{6}$/.test(hex||'')){document.documentElement.style.setProperty('--accent',hex);document.documentElement.style.setProperty('--accent-dynamic',hex)}}
+async function loadSettings(force=false){
+  const fresh=siteSettings&&Date.now()-siteSettingsAt<120000;
+  if(!force&&fresh){applyAccent(siteSettings.accent_color);document.title=siteSettings.site_name||'Tarazona Fotos';return siteSettings}
+  const {data}=await sb.from('site_settings').select('*').eq('id',1).maybeSingle();
+  siteSettings={...fallbackSite,...(data||{})};siteSettingsAt=Date.now();applyAccent(siteSettings.accent_color);document.title=siteSettings.site_name||'Tarazona Fotos';
+  const banner=document.getElementById('siteBannerImg');
+  if(banner){banner.src=siteSettings.cover_path?await mediaUrl(siteSettings.cover_path):'tarazona-header.jpg'}
+  return siteSettings
+}
+function placeMenuBelowBanner(){const b=document.querySelector('.site-banner');if(!b)return;const r=b.getBoundingClientRect();const top=Math.max(120,Math.round(r.bottom+34));document.documentElement.style.setProperty('--tf-menu-top',top+'px')}
+window.addEventListener('load',placeMenuBelowBanner);window.addEventListener('resize',()=>setTimeout(placeMenuBelowBanner,60));
+async function mediaUrl(path){
+  if(!path)return '';
+  const key=String(path);
+  const isDropbox=key.startsWith('dropbox:');
+  const userKey=cachedUser?.id||'anon';
+  const cacheKey=`${userKey}|${key}`;
+  const now=Date.now();
+  const hit=mediaCache.get(cacheKey);
+  if(hit?.url&&hit.expiresAt>now)return hit.url;
+  if(hit?.promise)return hit.promise;
+
+  // Persist signed media URLs in this browser session so a page reload does not
+  // generate a new URL for every photo. The URL itself is still time-limited.
+  if(!isDropbox){
+    if(!/^[A-Za-z0-9._-]{20,36}$/.test(key))return '';
+    try{
+      const raw=sessionStorage.getItem(`tf-media-v26:${cacheKey}`);
+      if(raw){const item=JSON.parse(raw);if(item?.url&&item.expiresAt>now){mediaCache.set(cacheKey,item);return item.url;}}
+    }catch(e){}
+    const promise=sb.storage.from('photos').createSignedUrl(key,21600).then(({data})=>{
+      const url=data?.signedUrl||'';
+      if(url){const item={url,expiresAt:now+19800000};mediaCache.set(cacheKey,item);try{sessionStorage.setItem(`tf-media-v26:${cacheKey}`,JSON.stringify(item));}catch(e){}}
+      else mediaCache.delete(cacheKey);
+      return url;
+    }).catch(()=>{mediaCache.delete(cacheKey);return '';});
+    mediaCache.set(cacheKey,{promise});
+    return promise;
+  }
+
+  const headers=await functionAuthHeaders();
+  if(!headers)return '';
+  const promise=sb.functions.invoke('dropbox-media?action=link',{body:{path:key},headers}).then(({data,error})=>{
+    const url=error?'':(data?.url||'');
+    if(url)mediaCache.set(cacheKey,{url,expiresAt:now+300000});else mediaCache.delete(cacheKey);
+    return url;
+  }).catch(()=>{mediaCache.delete(cacheKey);return '';});
+  mediaCache.set(cacheKey,{promise});
+  return promise;
+}
+async function deleteMedia(path){if(!String(path).startsWith('dropbox:'))return (await sb.storage.from('photos').remove([path])).error||null;const headers=await functionAuthHeaders();if(!headers)return new Error('La sesión ha caducado.');const {data,error}=await sb.functions.invoke('dropbox-media?action=delete',{body:{path},headers});return error||(data?.error?new Error(data.error):null)}
+async function adminCall(action,payload={},file=null){const fd=new FormData();fd.append('action',action);fd.append('payload',JSON.stringify(payload));if(file)fd.append('file',file,file.name);const {data,error}=await sb.functions.invoke('site-admin',{body:fd});if(error)throw error;if(data?.error)throw new Error(data.error);return data||{}}
+function adminButton(tab){return [...document.querySelectorAll('.tabs button')].find(b=>b.dataset.adminTab===tab)||null}
+async function adminTabRefresh(tab){return adminTab(tab,adminButton(tab))}
+
+async function loadTheme(){
+  let mode=localStorage.getItem('tf-theme-mode')||siteSettings?.default_theme||'auto';
+  try{
+    const u=await currentUser();
+    if(u){
+      const now=Date.now(), stamp=themeCacheAt.get(u.id)||0;
+      let data=themeCache.get(u.id);
+      if(!data||now-stamp>300000){
+        const r=await sb.from('user_preferences').select('theme_mode,dark_mode').eq('user_id',u.id).maybeSingle();
+        data=r.data||null;themeCache.set(u.id,data);themeCacheAt.set(u.id,now);
+      }
+      if(data?.theme_mode)mode=data.theme_mode;else if(data?.dark_mode===true)mode='dark';else if(data?.dark_mode===false)mode='light';
+    }
+  }catch(e){}
+  const dark=mode==='dark'||(mode==='auto'&&window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+  document.body.classList.toggle('dark-mode',dark);document.documentElement.dataset.themeMode=mode;
+  const tm=document.getElementById('themeMenuLabel');
+  if(tm)tm.textContent=dark?'Modo claro':'Modo oscuro';
+  const ti=document.querySelector('#themeMenuBtn span:first-child');
+  if(ti)ti.textContent=dark?'☀️':'🌙';
+  return mode;
+}
+async function setThemeMode(mode){
+  if(!['auto','light','dark'].includes(mode))mode='auto';
+  localStorage.setItem('tf-theme-mode',mode);
+  try{const u=await currentUser();if(u){const data={user_id:u.id,theme_mode:mode,dark_mode:mode==='dark',updated_at:new Date().toISOString()};themeCache.set(u.id,data);themeCacheAt.set(u.id,Date.now());await adminCall('save-preference',data)}}catch(e){}
+  await loadTheme();toast(mode==='auto'?'Modo automático activado.':mode==='dark'?'Modo oscuro activado.':'Modo claro activado.');
+}
+async function toggleUserTheme(){
+  const u=await currentUser();
+  if(!u){openLogin();return;}
+  const dark=document.body.classList.contains('dark-mode');
+  await setThemeMode(dark?'light':'dark');
+}
+function themeControl(selected='auto'){return `<select onchange="setThemeMode(this.value)" aria-label="Tema"><option value="auto"${selected==='auto'?' selected':''}>Automático</option><option value="light"${selected==='light'?' selected':''}>Claro</option><option value="dark"${selected==='dark'?' selected':''}>Oscuro</option></select>`}
+
+async function getAlbumStats(ids){
+  const list=[...(ids||[])];if(!list.length)return {};
+  const now=Date.now();if(albumStatsAt&&now-albumStatsAt<30000){
+    const cached={};for(const id of list)if(albumStatsCache.has(id))cached[id]=albumStatsCache.get(id);
+    if(Object.keys(cached).length===list.length)return cached;
+  }
+  const out={};for(const id of list)out[id]={bytes:0,count:0};
+  const meta=albumCache.filter(a=>list.includes(a.id)).map(a=>({id:a.id,title:a.title}));
+  const [photoRes,sessionRes]=await Promise.all([
+    sb.from('photos').select('album_id').in('album_id',list),
+    sb.auth.getSession()
+  ]);
+  for(const r of (photoRes.data||[])){if(!out[r.album_id])out[r.album_id]={bytes:0,count:0};out[r.album_id].count++}
+  const session=sessionRes.data?.session;
+  if(session){
+    try{
+      const {data}=await sb.functions.invoke('dropbox-media?action=stats',{body:{}});
+      const byTitle=new Map((data?.albums||[]).map(a=>[String(a.title||'').trim().toLowerCase(),{bytes:Number(a.bytes||0),count:Number(a.photos||0)}]));
+      for(const a of meta){const st=byTitle.get(String(a.title||'').trim().toLowerCase());if(!st)continue;out[a.id].bytes=Math.max(out[a.id].bytes,st.bytes);if(out[a.id].count===0&&st.count>0)out[a.id].count=st.count}
+    }catch(e){}
+  }
+  albumStatsCache=new Map(Object.entries({...Object.fromEntries(albumStatsCache),...out}));albumStatsAt=Date.now();return out;
+}
+
+function updateAlbumCards(stats){
+  document.querySelectorAll('.card[data-album-id]').forEach(card=>{
+    const id=card.dataset.albumId, s=stats?.[id]; if(!s)return;
+    const meta=card.querySelector('.card-meta'); if(!meta)return;
+    const n=Number(s.count||0),bytes=Number(s.bytes||0);
+    meta.textContent=`${n.toLocaleString('es-ES')} ${n===1?'foto':'fotos'}${bytes?` · ${formatBytes(bytes)}`:' · Tamaño no disponible'}`;
+  });
+}
+
+async function hydrateAlbumCovers(list){
+  const ids=(list||[]).map(a=>a.id).filter(Boolean);if(!ids.length)return;
+  const {data:ps}=await sb.from('photos').select('album_id,storage_path,created_at').in('album_id',ids).order('created_at',{ascending:true});
+  const first={};for(const p of ps||[]){if(!first[p.album_id])first[p.album_id]=p.storage_path}
+  const entries=Object.entries(first);let cursor=0;
+  async function worker(){while(cursor<entries.length){const i=cursor++, [albumId,path]=entries[i];try{const url=await mediaUrl(path);if(!url)continue;const card=document.querySelector(`.card[data-album-id="${CSS.escape(albumId)}"] .cover`);if(card){card.style.backgroundImage=`url(\"${url.replace(/\"/g,'\\"')}\")`;card.style.backgroundSize='cover';card.style.backgroundPosition='center'}}catch(e){}}}
+  await Promise.all(Array.from({length:Math.min(4,entries.length)},worker));
+}
+
+function cardHtml(a,i=0,stats=null){
+  const title=a.title||'Álbum',date=a.event_date?dateLabel(a.event_date):(a.year||'Archivo'),s=stats?.[a.id];
+  const n=s?Number(s.count||0):null,bytes=s?Number(s.bytes||0):0,cover=a.cover_url||'';
+  const meta=n===null?'Cargando fotos…':`${n.toLocaleString('es-ES')} ${n===1?'foto':'fotos'}${bytes?` · ${formatBytes(bytes)}`:' · Tamaño no disponible'}`;
+  const style=cover?` style="background-image:url('${esc(cover)}');background-size:cover;background-position:center"`:'';
+  return `<button type="button" class="card" data-album-id="${esc(a.id||'')}" aria-label="Abrir álbum ${esc(title)}"><div class="${coverClass(i)}"${style}><span class="card-meta">${meta}</span><b>${esc(title)}</b></div><small>${esc(date)}</small><strong>${esc(title)}</strong></button>`;
+}
+
+async function refreshHeader(){
+  const u=await currentUser();
+  await loadSettings();
+  await loadTheme();
+  const nav=document.getElementById('adminNav');
+  if(!u){
+    accountBtn.innerHTML='Entrar';
+    if(nav)nav.style.display='none';
+    return;
+  }
+  const profile=await getCachedProfile(u.id,'full_name,role,avatar_path');
+  const av=profile?.avatar_path?await mediaUrl(profile.avatar_path):'';
+  const avatarHtml=av?`<img src="${esc(av)}" alt="">`:esc((profile?.full_name||u.email||'U').slice(0,1).toUpperCase());
+  accountBtn.innerHTML=`<span class="header-avatar">${avatarHtml}</span><span>Mi cuenta</span>`;
+  accountBtn.classList.toggle('has-avatar',true);
+  if(nav)nav.style.display=profile?.role==='admin'?'flex':'none';
+}
+
+async function loadHomeData(){
+  const {data:albums,error}=await sb.from('albums').select('id,title,year,event_date,description,created_at,is_published').eq('is_published',true).order('year',{ascending:false}).order('event_date',{ascending:false});
+  if(error)return {albums:[],stats:{}};
+  const ids=(albums||[]).map(a=>a.id);const stats=await getAlbumStats(ids);for(const a of albums||[]){a.photo_count=stats[a.id]?.count||0;a.total_bytes=stats[a.id]?.bytes||0}
+  return {albums:await addAlbumCovers(albums||[]),stats};
+}
+
+function goHome(){return home()}
+
+async function home(){
+  const u=await currentUser();await loadTheme();await refreshHeader();let content='';
+  const settings=siteSettings||await loadSettings();
+  let importantHtml='',featuredHtml='',memoriesHtml='',eventsHtml='';
+  if(u){
+    const [nres,homeData,mems,evs]=await Promise.all([
+      sb.from('notifications').select('id,title,body,created_at,is_important').eq('is_published',true).order('created_at',{ascending:false}).limit(5),
+      loadHomeData(),
+      loadMemories(3),
+      loadUpcomingEvents(3)
+    ]);
+    const important=(nres.data||[]).filter(n=>n.is_important);
+    if(important.length)importantHtml=`<section class="section-block"><div class="eyebrow-row"><label>AVISOS IMPORTANTES</label><button class="text-btn" onclick="notifications()">Ver todos →</button></div>${important.map(n=>`<div class="notice important"><div class="chip">⚠️ Importante</div><h3>${esc(n.title)}</h3><p>${esc(n.body||'')}</p><small>${dateLabel(n.created_at)}</small></div>`).join('')}</section>`;
+    if(settings.featured_photo_id){const {data:p}=await sb.from('photos').select('id,storage_path,original_filename,caption').eq('id',settings.featured_photo_id).maybeSingle();if(p){const url=await mediaUrl(p.storage_path);const {count}=await sb.from('featured_photo_likes').select('*',{count:'exact',head:true}).eq('photo_id',p.id);featuredHtml=`<section class="section-block"><div class="eyebrow-row"><label>FOTO DESTACADA</label><span class="chip">⭐ ${count||0} me gusta</span></div><div class="featured"><div class="featured-media"><img src="${esc(url)}" alt="${esc(p.original_filename||'Foto destacada')}"></div><div class="featured-copy"><h2>${esc(settings.featured_title||'Foto destacada')}</h2><p>${esc(settings.featured_text||p.caption||'Un recuerdo especial de nuestra historia.')}</p><div class="metric-row"><button class="cta" onclick="toggleFeaturedLike('${p.id}')">❤️ Me gusta</button><button class="ghost" onclick="shareText('${esc(settings.site_name)}: ${esc(settings.featured_title||'Foto destacada')}')">📤 Compartir</button></div></div></div></section>`}}
+    if((mems||[]).length)memoriesHtml=`<section class="section-block"><div class="eyebrow-row"><label>RECUERDOS</label><button class="text-btn" onclick="memoriesPage()">Ver más →</button></div><h2>Tal día como hoy</h2><div class="inline-grid">${(mems||[]).map(m=>`<div class="notice"><b>${esc(m.title)}</b><p>Hace ${m.years} ${m.years===1?'año':'años'} · ${dateLabel(m.event_date)}</p><button class="ghost" onclick="openAlbum('${m.id}')">Ver álbum</button></div>`).join('')}</div></section>`;
+    if((evs||[]).length)eventsHtml=`<section class="section-block"><div class="eyebrow-row"><label>PRÓXIMOS ACTOS</label><button class="text-btn" onclick="calendarPage()">Calendario →</button></div><div class="inline-grid">${(evs||[]).map(e=>eventCardHtml(e)).join('')}</div></section>`;
+    const first=(homeData.albums||[]).slice(0,6);content=`<section class="section-block albums-first"><div class="eyebrow-row"><label>ÁLBUMES</label><button class="text-btn" onclick="albums()">Ver todos →</button></div><h2>Tus recuerdos</h2><p class="section-intro">Toca una carpeta para entrar directamente en sus fotografías.</p><div class="grid">${first.map((a,i)=>cardHtml(a,i,homeData.stats)).join('')}</div></section>`;
+  }else{
+    content=`<section class="section-block albums-first"><div class="eyebrow-row"><label>ÁLBUMES</label></div><h2>Tus recuerdos</h2><div class="locked-card"><div class="big-lock">🔒</div><h2>Fototeca privada</h2><p>Inicia sesión para ver los álbumes y sus fotografías.</p><button class="cta" onclick="openLogin()">Entrar a la fototeca →</button></div></section>`;
+  }
+  const hero= `<section class="hero"><label>FOTOTECA PRIVADA · FALLA RAVAL</label><h1>${esc(settings.hero_title)}</h1><p>${esc(settings.hero_subtitle)}</p><div class="hero-actions"><button class="cta" onclick="accountRoute()">Entrar a la fototeca <b>→</b></button><button class="ghost" onclick="albums()">Ver álbumes</button></div></section>`;
+  app.innerHTML=`${hero}${importantHtml}${featuredHtml}${eventsHtml}${memoriesHtml}${content}<section class="private"><div class="private-icon">🔒</div><div><label>ACCESO PRIVADO</label><h2>${esc(settings.welcome_text)}</h2><p>${esc(settings.about_text)}</p></div><button class="light-btn" onclick="accountRoute()">Entrar</button></section><footer class="site-footer"><span>${esc(settings.footer_text||settings.site_name)}</span><span><a class="muted-link" href="#" onclick="aboutPage();return false">Sobre nosotros</a> · <a class="muted-link" href="#" onclick="contactPage();return false">Contacto</a></span></footer>`;
+}
+
+async function albums(){
+  refreshHeader().catch(()=>{});
+  const {data,error}=await sb.from('albums').select('id,title,year,event_date,description,created_at').eq('is_published',true).order('year',{ascending:false}).order('event_date',{ascending:false});
+  if(error){app.innerHTML=`<section class="page"><button class="back" type="button" onclick="home()">← Inicio</button><h1>Álbumes</h1><div class="notice">No se han podido cargar los álbumes todavía.</div></section>`;return}
+  albumCache=data||[];
+  const years=[...new Set(albumCache.map(a=>a.year).filter(Boolean))];let html='';
+  if(!albumCache.length)html='<div class="empty"><b>📷</b><h2>Aún no hay álbumes</h2></div>';
+  for(const y of years){const group=albumCache.filter(a=>a.year===y);html+=`<h2 class="year-title">${esc(y)}</h2><div class="grid">${group.map((a,i)=>cardHtml(a,i)).join('')}</div>`}
+  const noYear=albumCache.filter(a=>!a.year);if(noYear.length)html+=`<h2 class="year-title">Archivo</h2><div class="grid">${noYear.map((a,i)=>cardHtml(a,i)).join('')}</div>`;
+  app.innerHTML=`<section class="page"><button class="back" type="button" onclick="home()">← Inicio</button><div class="page-eyebrow">TARAZONA FOTOS</div><h1>Álbumes</h1><p>Todo organizado por año y evento. Ahora también mostramos el <b>peso total</b> del álbum cuando está disponible.</p><div id="albums-status" class="muted" style="margin-bottom:10px">Cargando datos de los álbumes…</div>${html}</section>`;
+  const ids=albumCache.map(a=>a.id);
+  getAlbumStats(ids).then(stats=>{albumCache.forEach(a=>{a.photo_count=stats[a.id]?.count||0;a.total_bytes=stats[a.id]?.bytes||0});updateAlbumCards(stats);const st=document.getElementById('albums-status');if(st)st.textContent='';}).catch(()=>{const st=document.getElementById('albums-status');if(st)st.textContent='';});
+  hydrateAlbumCovers(albumCache).catch(()=>{});
+}
+
+async function openAlbum(id){
+  if(!id){openLogin();return}
+  closeSide();
+  app.innerHTML=`<section class="page"><button class="back" type="button" onclick="albums()">← Álbumes</button><div class="page-eyebrow">ÁLBUM</div><h1>Cargando álbum…</h1><p class="muted">Estamos preparando las fotografías.</p></section>`;
+  await new Promise(r=>requestAnimationFrame(r));
+  let a=albumCache.find(x=>String(x.id)===String(id))||null;
+  if(!a){
+    const r=await sb.from('albums').select('id,title,year,event_date,description,is_published').eq('id',id).maybeSingle();
+    if(r.error||!r.data){toast(`No se ha podido abrir el álbum${r.error?.message?': '+r.error.message:''}.`);albums();return}
+    a=r.data;
+  }
+  const u=await currentUser();
+  if(!u||a.is_published===false){
+    app.innerHTML=`<section class="page"><button class="back" type="button" onclick="albums()">← Álbumes</button><label>${esc(a.year||dateLabel(a.event_date))}</label><h1>${esc(a.title)}</h1><p>${esc(a.description||'Álbum privado.')}</p><div class="locked-card"><div class="big-lock">🔒</div><h2>Álbum privado</h2><p>Inicia sesión para verlo.</p><button class="cta" type="button" onclick="openLogin()">Entrar</button></div></section>`;return}
+  await renderAlbum(a);
+}
+
+// Delegación de clic para que los álbumes funcionen también en navegadores móviles
+// aunque el contenido de la página se haya generado dinámicamente.
+document.addEventListener('click',function(event){
+  const card=event.target.closest?.('.card[data-album-id]');
+  if(!card)return;
+  event.preventDefault();
+  event.stopPropagation();
+  openAlbum(card.dataset.albumId);
+},true);
+
+async function ensurePhotoLoaded(i){
+  const item=(window.viewerItems||[])[i];if(!item)return null;if(item.url)return item;
+  if(item._loading)return item._loading;
+  item._loading=mediaUrl(item.storage_path).then(url=>{item.url=url||'';return item}).finally(()=>{delete item._loading});
+  const out=await item._loading;
+  const btn=document.querySelector(`.photo[data-photo-index="${i}"]`);
+  if(btn&&out.url){btn.classList.add('real');btn.innerHTML=`<img src="${esc(out.url)}" alt="${esc(out.original_filename||'Fotografía')}" loading="lazy">`}
+  return out;
+}
+
+async function renderAlbum(a){
+  const r=await sb.from('photos').select('id,storage_path,original_filename,created_at,caption').eq('album_id',a.id).order('created_at',{ascending:false});
+  if(r.error){toast(`No se han podido cargar las fotografías: ${r.error.message||'error de Appwrite'}`);return}
+  const photos=r.data||[];
+  const cached=albumStatsCache.get(a.id)||{};const count=Number(cached.count||photos.length);const bytes=Number(cached.bytes||0);
+  window.viewerItems=photos.map(p=>({...p,url:''}));window.currentAlbumId=a.id;
+  app.innerHTML=`<section class="page album-page"><button class="back" type="button" onclick="albums()">← Álbumes</button><div class="page-eyebrow">GALERÍA DE FOTOS</div><div class="album-head"><div><label>${esc(a.year||dateLabel(a.event_date))}</label><h1>${esc(a.title)}</h1><p>${esc(a.description||'')} · ${count.toLocaleString('es-ES')} fotografías${bytes?` · <b>${formatBytes(bytes)}</b>`:''}</p></div><div class="photo-tools"><button class="cta" onclick="downloadAlbum('${a.id}')">↓ Descargar</button></div></div><div id="photo-load-note" class="muted" style="margin-bottom:10px">Las fotografías se cargan a medida que aparecen en pantalla.</div>${photos.length?`<div class="photos">${photos.map((p,i)=>`<button type="button" class="photo" data-photo-index="${i}" onclick="showPhotoIndex(${i})"><div class="photo-placeholder">📷</div></button>`).join('')}</div>`:`<div class="empty"><b>📷</b><h2>Este álbum no tiene fotografías visibles</h2><p>El álbum se ha abierto correctamente, pero no se han encontrado fotografías disponibles.</p></div>`}</section>`;
+  const buttons=[...document.querySelectorAll('.photo[data-photo-index]')];
+  if(!('IntersectionObserver' in window)){
+    for(let i=0;i<Math.min(8,photos.length);i++)await ensurePhotoLoaded(i);
+  }else{
+    const io=new IntersectionObserver(entries=>{for(const entry of entries){if(entry.isIntersecting){const b=entry.target;const i=Number(b.dataset.photoIndex);ensurePhotoLoaded(i).finally(()=>io.unobserve(b))}}},{rootMargin:'500px 0px'});
+    buttons.forEach(b=>io.observe(b));
+  }
+  if(!photos.length){const n=document.getElementById('photo-load-note');if(n)n.textContent='';}
+}
+
+async function downloadPhoto(url,name){try{toast('Preparando descarga…');const res=await fetch(url);if(!res.ok)throw new Error('No se pudo descargar la fotografía');const blob=await res.blob();const href=URL.createObjectURL(blob);const a=document.createElement('a');a.href=href;a.download=name||'fotografia.jpg';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(href),1500);toast('Fotografía descargada.')}catch(e){toast(e.message||'No se pudo descargar la fotografía')}}
+async function downloadAlbum(id){try{toast('Preparando el álbum…');const {data:photos,error}=await sb.from('photos').select('storage_path,original_filename,sort_order').eq('album_id',id).eq('is_published',true).order('sort_order',{ascending:true}).order('created_at',{ascending:true});if(error)throw error;if(!photos?.length)return toast('Este álbum no tiene fotografías.');if(typeof JSZip==='undefined')return toast('La descarga múltiple no está disponible ahora.');const zip=new JSZip();let ok=0;for(const p of photos){const url=await mediaUrl(p.storage_path);if(!url)continue;const res=await fetch(url);if(!res.ok)continue;zip.file(p.original_filename||`foto-${ok+1}.jpg`,await res.blob());ok++;toast(`Preparando ${ok} de ${photos.length}…`)}if(!ok)return toast('No se pudieron preparar las fotografías.');const blob=await zip.generateAsync({type:'blob'});const href=URL.createObjectURL(blob);const a=document.createElement('a');a.href=href;a.download=`Tarazona-Fotos-${id}.zip`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(href),3000);toast(`Álbum preparado: ${ok} fotografías.`)}catch(e){toast(e.message||'No se pudo preparar el álbum')}}
+async function showPhotoIndex(i){const p=await ensurePhotoLoaded(i);if(!p||!p.url){toast('No se ha podido cargar esta fotografía.');return}window.viewerIndex=i;await showPhoto(p.url,p.original_filename||'Fotografía',p.id,i)}
+async function showPhoto(url,name,id='',index=0){
+  window.viewerIndex=index;viewerZoom=1;let comments=[],isLiked=false,likeCount=0;const u=await currentUser();
+  if(id){const r=await sb.from('comments').select('id,body,created_at,user_id').eq('photo_id',id).eq('is_visible',true).order('created_at',{ascending:true});comments=r.data||[];const ids=[...new Set(comments.map(c=>c.user_id).filter(Boolean))];let pm=new Map();if(ids.length){const pr=await sb.from('public_profiles').select('id,full_name,avatar_path').in('id',ids);pm=new Map((pr.data||[]).map(p=>[p.id,p]));}comments=comments.map(c=>({...c,author:pm.get(c.user_id)?.full_name||'Usuario'}));if(u){const {data:fl}=await sb.from('favorites').select('photo_id').eq('photo_id',id).eq('user_id',u.id).maybeSingle();isLiked=!!fl}}
+  const commentsHtml=comments.map(c=>`<div class="notice"><b>${esc(c.author)}</b><div>${esc(c.body)}</div><small>${dateLabel(c.created_at)}</small></div>`).join('')||'<p class="muted">Todavía no hay comentarios.</p>';
+  body.innerHTML=`<div class="viewer"><button class="viewer-prev" onclick="moveViewer(-1)" aria-label="Anterior">‹</button><img id="viewerImg" class="photo-zoom" src="${esc(url)}" alt="${esc(name)}"><button class="viewer-next" onclick="moveViewer(1)" aria-label="Siguiente">›</button><div class="photo-zoom-controls"><button class="ghost" onclick="zoomPhoto(-.2)">− Zoom</button><button class="ghost" onclick="zoomPhoto(.2)">+ Zoom</button><button class="ghost" onclick="zoomPhoto(0)">100%</button></div><div class="viewer-actions"><button class="cta" onclick="downloadPhoto('${esc(url)}','${esc(name)}')">↓ Descargar foto</button>${id?`<button class="ghost" onclick="toggleFavorite('${id}')">${isLiked?'♥':'♡'} Favorito</button><button class="ghost" onclick="requestRemoval('${id}')">Solicitar retirada</button>`:''}<button class="ghost" onclick="shareCurrentPhoto('${esc(name)}')">📱 Compartir foto</button><button class="ghost" onclick="closeM()">Cerrar</button></div>${id?`<div class="comment-box"><h3>Comentarios</h3>${commentsHtml}<div class="comment-form"><input id="commentInput" placeholder="Escribe un comentario…"><button class="cta" onclick="addComment('${id}')">Enviar</button></div></div>`:''}</div>`;modal.classList.remove('hide');
+}
+function zoomPhoto(delta){const img=document.getElementById('viewerImg');if(!img)return;viewerZoom=delta===0?1:Math.max(.7,Math.min(3,viewerZoom+delta));img.style.transform=`scale(${viewerZoom})`}
+function moveViewer(delta){const arr=window.viewerItems||[];if(!arr.length)return;let n=(window.viewerIndex||0)+delta;if(n<0)n=arr.length-1;if(n>=arr.length)n=0;showPhotoIndex(n)}
+async function shareText(text){
+  const message=`${siteSettings?.site_name||'Tarazona Fotos'} — ${text}\n${location.href}`;
+  try{
+    if(navigator.share){await navigator.share({title:siteSettings?.site_name||'Tarazona Fotos',text:message,url:location.href});return;}
+    if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(message);toast('Enlace copiado. Puedes compartirlo desde tu teléfono.');return;}
+    toast('Selecciona Compartir desde tu teléfono para enviar el enlace.');
+  }catch(e){if(e?.name!=='AbortError')toast('No se pudo abrir el menú de compartir.');}
+}
+async function sharePhotoFile(name){
+  const img=document.getElementById('viewerImg');
+  if(!img?.src)return shareText(`📷 ${name}`);
+  try{
+    if(!navigator.share||!navigator.canShare)throw new Error('file-share-no');
+    const res=await fetch(img.src,{mode:'cors'});if(!res.ok)throw new Error('image-fetch-failed');
+    const blob=await res.blob();const ext=(blob.type.split('/')[1]||'jpg').replace('jpeg','jpg');
+    const safeBase=(name||'fotografia').replace(/\.[a-z0-9]{2,5}$/i,'').replace(/[^a-zA-Z0-9._-]+/g,'_');
+    const file=new File([blob],`${safeBase}.${ext}`,{type:blob.type||'image/jpeg'});
+    if(!navigator.canShare({files:[file]}))throw new Error('file-share-unsupported');
+    await navigator.share({files:[file],title:name||'Fotografía',text:`${siteSettings?.site_name||'Tarazona Fotos'} — ${name||'Fotografía'}`});
+  }catch(e){
+    if(e?.name==='AbortError')return;
+    await shareText(`📷 ${name}`);
+  }
+}
+async function shareCurrentPhoto(name){await sharePhotoFile(name)}
+async function addComment(photoId){const u=await currentUser();if(!u)return openLogin();const input=document.getElementById('commentInput'),bodyText=input?.value.trim();if(!bodyText)return toast('Escribe un comentario.');const {error}=await sb.from('comments').insert({photo_id:photoId,user_id:u.id,body:bodyText});if(error)return toast(error.message);toast('Comentario añadido.');showPhotoIndex(window.viewerIndex)}
+async function toggleFavorite(photoId){const u=await currentUser();if(!u)return openLogin();const {data:old}=await sb.from('favorites').select('photo_id').eq('photo_id',photoId).eq('user_id',u.id).maybeSingle();const r=old?await sb.from('favorites').delete().eq('photo_id',photoId).eq('user_id',u.id):await sb.from('favorites').insert({photo_id:photoId,user_id:u.id});if(r.error)return toast(r.error.message);toast(old?'Quitado de favoritos.':'Añadido a favoritos.');showPhotoIndex(window.viewerIndex)}
+async function toggleFeaturedLike(photoId){const u=await currentUser();if(!u)return openLogin();const {data:old}=await sb.from('featured_photo_likes').select('id').eq('photo_id',photoId).eq('user_id',u.id).maybeSingle();const r=old?await sb.from('featured_photo_likes').delete().eq('id',old.id):await sb.from('featured_photo_likes').insert({photo_id:photoId,user_id:u.id});if(r.error)return toast(r.error.message);toast(old?'Me gusta retirado.':'¡Me gusta añadido!');home()}
+function openRadio(){window.open('https://www.kissfm.es/','_blank','noopener')}
+
+async function accountRoute(){const user=await currentUser();user?routeUser():openLogin()}
+function passwordInput(id,autocomplete,placeholder){return `<div class="password-wrap"><input id="${id}" type="password" autocomplete="${autocomplete}" placeholder="${placeholder}" required><button type="button" class="password-toggle" aria-label="Mostrar contraseña" onclick="togglePassword('${id}',this)">👁️</button></div>`}
+function togglePassword(id,btn){const input=document.getElementById(id);if(!input)return;const show=input.type==='password';input.type=show?'text':'password';btn.textContent=show?'🙈':'👁️';btn.setAttribute('aria-label',show?'Ocultar contraseña':'Mostrar contraseña')}
+function openLogin(){body.innerHTML=`<div class="modal-head"><label>TARAZONA FOTOS</label><h2>Entra a tu cuenta</h2><p>Accede a tus álbumes y fotografías privadas.</p></div><form onsubmit="event.preventDefault();signIn()"><input id="email" type="email" autocomplete="email" placeholder="Correo electrónico" required>${passwordInput('pass','current-password','Contraseña')}<button class="cta full" type="submit">Entrar</button></form><button class="link" type="button" onclick="openResetPassword()">¿Has olvidado la contraseña?</button><div class="or"><span>o</span></div><button class="link" onclick="openSignUp()">Crear una cuenta</button><p class="form-note">Si acabas de registrarte, comprueba tu correo si la confirmación está activada. Si ya estabas registrado y no recuerdas la contraseña, usa la opción de recuperación.</p>`;modal.classList.remove('hide');setTimeout(()=>document.getElementById('email')?.focus(),80)}
+function openSignUp(){body.innerHTML=`<div class="modal-head"><label>TARAZONA FOTOS</label><h2>Crear una cuenta</h2><p>El nombre o alias será el que verán los demás usuarios en Personas y en tus comentarios.</p></div><form onsubmit="event.preventDefault();signUp()"><input id="signupName" autocomplete="name" placeholder="Nombre o alias" required maxlength="60"><input id="signupEmail" type="email" autocomplete="email" placeholder="Correo electrónico" required>${passwordInput('signupPass','new-password','Contraseña (mínimo 8 caracteres)')}${passwordInput('signupPass2','new-password','Repite la contraseña')}<button class="cta full" type="submit">Registrarme</button></form><div class="or"><span>o</span></div><button class="link" onclick="openLogin()">Ya tengo una cuenta</button>`;modal.classList.remove('hide');setTimeout(()=>document.getElementById('signupName')?.focus(),80)}
+async function signIn(){const emailV=document.getElementById('email')?.value.trim(),passV=document.getElementById('pass')?.value||'';if(!emailV||!passV)return toast('Escribe tu correo y contraseña.');const {error}=await sb.auth.signInWithPassword({email:emailV,password:passV});if(error){const msg=String(error.message||'').toLowerCase();if(msg.includes('invalid login credentials'))return toast('El correo o la contraseña no son correctos. Si no recuerdas la contraseña, usa «¿Has olvidado la contraseña?»');if(msg.includes('email not confirmed'))return toast('Primero confirma tu correo electrónico y vuelve a intentarlo.');return toast(error.message)}closeM();await routeUser()}
+async function signUp(){const nameV=document.getElementById('signupName')?.value.trim(),emailV=document.getElementById('signupEmail')?.value.trim(),passV=document.getElementById('signupPass')?.value||'',pass2V=document.getElementById('signupPass2')?.value||'';if(!nameV||!emailV||passV.length<8)return toast('Escribe un nombre o alias, un correo y una contraseña de al menos 8 caracteres.');if(passV!==pass2V)return toast('Las dos contraseñas no coinciden.');const {data,error}=await sb.auth.signUp({email:emailV,password:passV,options:{data:{full_name:nameV}}});if(error)return toast(error.message);body.innerHTML=`<div class="success"><div>✉️</div><h2>Cuenta creada</h2><p>Tu nombre o alias se ha guardado. Si se solicita confirmación, revisa tu correo antes de intentar entrar.</p><button class="cta" onclick="closeM()">Cerrar</button></div>`}
+async function openResetPassword(){const prefill=document.getElementById('email')?.value.trim()||'';body.innerHTML=`<div class="modal-head"><label>TARAZONA FOTOS</label><h2>Recuperar contraseña</h2><p>Escribe tu correo y te enviaremos un enlace para crear una nueva contraseña.</p></div><input id="resetEmail" type="email" autocomplete="email" value="${esc(prefill)}" placeholder="Correo electrónico" required><button class="cta full" onclick="sendResetPassword()">Enviar enlace</button><button class="link" onclick="openLogin()">Volver a entrar</button>`;modal.classList.remove('hide');setTimeout(()=>document.getElementById('resetEmail')?.focus(),80)}
+async function sendResetPassword(){const emailV=document.getElementById('resetEmail')?.value.trim();if(!emailV)return toast('Escribe tu correo electrónico.');const {error}=await sb.auth.resetPasswordForEmail(emailV,{redirectTo:window.location.origin});if(error)return toast(error.message);body.innerHTML=`<div class="success"><div>✉️</div><h2>Enlace enviado</h2><p>Revisa tu correo. Si la dirección corresponde a una cuenta, recibirás instrucciones para cambiar la contraseña.</p><button class="cta" onclick="closeM()">Cerrar</button></div>`}
+
+async function signOut(){try{await sb.auth.signOut();closeSide();closeM();toast('Sesión cerrada.');home()}catch(e){toast(e.message||'No se pudo cerrar la sesión.')}}
+async function routeUser(){const user=await currentUser();if(!user){home();return}const profile=await getCachedProfile(user.id,'full_name,role,avatar_path');if(profile?.role==='admin')admin();else account(user,profile);await refreshHeader()}
+function isEmailLike(v){return !!v&&/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(v).trim())}
+async function account(user,p){
+  const mode=await loadTheme();const avatar=p?.avatar_path?await mediaUrl(p.avatar_path):'';
+  const displayName=p?.full_name&&!isEmailLike(p.full_name)?p.full_name:'';
+  const needAlias=!displayName;
+  app.innerHTML=`<section class="page"><label>MI CUENTA</label><div class="account-card"><div class="profile-head"><div class="avatar">${avatar?`<img src="${esc(avatar)}" alt="">`:(displayName||'U').slice(0,1).toUpperCase()}</div><div><h1>Hola${displayName?', '+esc(displayName):''} 👋</h1><p>${esc(user.email)}</p></div></div>${needAlias?`<div class="notice"><b>👤 Pon tu nombre o alias</b><div class="muted">Es el nombre que verán los demás en Personas y en tus comentarios. Tu correo no se mostrará.</div><button class="ghost" onclick="editMyProfile()">✏️ Añadir nombre o alias</button></div>`:''}<div class="account-actions"><button class="cta" onclick="albums()">Ver mis álbumes →</button><button class="ghost" onclick="editMyProfile()">✏️ ${displayName?'Cambiar nombre o alias':'Añadir nombre o alias'}</button><label class="ghost" style="display:inline-block">📷 Foto de perfil<input type="file" id="avatarFile" accept="image/*" hidden onchange="uploadAvatar(this.files[0])"></label><div class="row"><span class="muted">Tema</span>${themeControl(mode)}</div><button class="ghost" onclick="peoplePage()">Personas</button><button class="ghost" onclick="messagesPage()">Mensajes</button><button class="ghost" onclick="myPhotosPage()">Mis fotos</button><button class="ghost" onclick="myCommentsPage()">Mis comentarios</button><button class="ghost" onclick="requestsPage()">Mis solicitudes</button>${p?.role==='admin'?'<button class="cta" onclick="admin()">⚙️ Administración</button>':''}<button class="ghost" onclick="signOut()">Cerrar sesión</button></div></div></section>`
+}
+async function editMyProfile(){const u=await currentUser();if(!u)return openLogin();const {data:p}=await sb.from('profiles').select('full_name').eq('id',u.id).maybeSingle();const current=isEmailLike(p?.full_name)?'':(p?.full_name||'');body.innerHTML=`<div class="modal-head"><label>MI PERFIL</label><h2>Nombre o alias</h2><p>Este nombre aparecerá en Personas y junto a tus comentarios. Tu correo seguirá siendo privado.</p></div><input id="myName" value="${esc(current)}" maxlength="60" autocomplete="name" placeholder="Escribe tu nombre o alias" required><button class="cta full" onclick="saveMyProfile()">Guardar nombre</button>`;modal.classList.remove('hide');setTimeout(()=>document.getElementById('myName')?.focus(),80)}
+async function saveMyProfile(){const u=await currentUser();if(!u)return openLogin();const name=document.getElementById('myName').value.trim();if(!name)return toast('Escribe un nombre o alias.');if(name.length>60)return toast('El nombre o alias no puede superar 60 caracteres.');try{await adminCall('save-profile',{full_name:name});await sb.auth.updateUser({data:{full_name:name}});profileCache.delete(u.id);profileCacheAt.delete(u.id);closeM();toast('Nombre o alias guardado.');routeUser()}catch(e){toast(e.message||'No se pudo guardar el nombre.')}}
+async function uploadAvatar(file){if(!file)return;try{const data=await adminCall('upload-avatar',{user_id:(await currentUser()).id},file);toast('Foto de perfil actualizada.');routeUser()}catch(e){toast(`No se pudo actualizar la foto: ${e.message}`)}}
+
+async function favorites(){const u=await currentUser();if(!u)return openLogin();const {data,error}=await sb.from('favorites').select('photo_id,created_at,photos(id,album_id,storage_path,original_filename,albums(title))').eq('user_id',u.id).order('created_at',{ascending:false});if(error)return toast(error.message);const items=[];for(const f of data||[]){const p=f.photos;if(!p)continue;items.push({...p,url:await mediaUrl(p.storage_path)})}app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">MIS FOTOS</div><h1>Favoritos</h1>${items.length?`<div class="photos">${items.map((p,i)=>`<button class="photo real" onclick="showPhoto('${esc(p.url)}','${esc(p.original_filename||'Fotografía')}','${p.id}',${i})"><img src="${esc(p.url)}" alt="" loading="lazy"></button>`).join('')}</div>`:`<div class="empty"><b>♡</b><h2>Aún no tienes favoritos</h2></div>`}</section>`;window.viewerItems=items}
+function downloads(){app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">DESCARGAS</div><h1>Descargar fotografías</h1><p>Entra en cualquier álbum para descargar una foto o el álbum completo en ZIP.</p><button class="cta" onclick="albums()">Ver álbumes →</button></section>`}
+async function myPhotosPage(){const u=await currentUser();if(!u)return openLogin();const {data,error}=await sb.from('photos').select('id,storage_path,original_filename,created_at').eq('uploaded_by',u.id).order('created_at',{ascending:false});if(error)return toast(error.message);const items=[];for(const p of data||[]){items.push({...p,url:await mediaUrl(p.storage_path)})}window.viewerItems=items;app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">MI CUENTA</div><h1>Mis fotos</h1><p>Fotografías que has subido a la fototeca.</p>${items.length?`<div class="photos">${items.map((p,i)=>`<button class="photo" onclick="showPhotoIndex(${i})"><img src="${esc(p.url)}" alt="${esc(p.original_filename||'Fotografía')}" loading="lazy"></button>`).join('')}</div>`:'<div class="empty">Todavía no has subido fotografías.</div>'}</section>`}
+async function openCommentPhoto(photoId){if(!photoId)return toast('Esta fotografía ya no está disponible.');const {data:p,error}=await sb.from('photos').select('id,storage_path,original_filename,caption').eq('id',photoId).maybeSingle();if(error||!p?.storage_path)return toast('No se ha podido localizar la fotografía.');const url=await mediaUrl(p.storage_path);if(!url)return toast('No se ha podido cargar la fotografía.');window.viewerItems=[{...p,url}];window.viewerIndex=0;await showPhoto(url,p.original_filename||'Fotografía',p.id,0)}
+async function myCommentsPage(){const u=await currentUser();if(!u)return openLogin();const {data,error}=await sb.from('comments').select('id,body,created_at,user_id,photo_id,photos(id,storage_path,original_filename,albums(title))').eq('is_visible',true).order('created_at',{ascending:false});if(error)return toast(error.message);const ids=[...new Set((data||[]).map(c=>c.user_id).filter(Boolean))];let names=new Map();if(ids.length){const pr=await sb.from('public_profiles').select('id,full_name').in('id',ids);names=new Map((pr.data||[]).map(p=>[p.id,p.full_name||'Usuario']))}const rows=[];for(const c of data||[]){const photo=c.photos;const clickable=!!photo?.id;rows.push(`<button type="button" class="notice comment-link-card${clickable?' is-clickable':''}" ${clickable?`onclick="openCommentPhoto('${photo.id}')"`: 'disabled'} aria-label="${clickable?'Abrir fotografía del comentario':'Fotografía no disponible'}"><div class="comment-row">${photo?.storage_path?`<span class="comment-thumb" aria-hidden="true"><img src="${esc(await mediaUrl(photo.storage_path))}" alt="" loading="lazy"></span>`:''}<span class="comment-content"><span class="row"><b>${esc(names.get(c.user_id)||'Usuario')}</b><small>${dateLabel(c.created_at)}</small></span><span class="comment-body">${esc(c.body)}</span>${photo?.original_filename?`<span class="muted small">📷 ${esc(photo.original_filename)}${photo.albums?.title?` · ${esc(photo.albums.title)}`:''}</span>`:''}<span class="comment-jump">${clickable?'📷 Abrir fotografía':'Fotografía no disponible'}</span></span></div></button>`)}app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">COMUNIDAD</div><h1>Comentarios</h1><p class="muted">Aquí aparecen los comentarios visibles de la comunidad. Pulsa cualquier comentario para ir directamente a su fotografía.</p>${rows.join('')||'<div class="empty">Todavía no hay comentarios.</div>'}</section>`}
+async function requestsPage(){const u=await currentUser();if(!u)return openLogin();const {data,error}=await sb.from('removal_requests').select('id,photo_id,reason,status,admin_note,created_at').eq('user_id',u.id).order('created_at',{ascending:false});if(error)return toast(error.message);app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">PRIVACIDAD</div><h1>Mis solicitudes de retirada</h1>${(data||[]).map(r=>`<div class="notice"><div class="row"><b>${esc(r.status)}</b><small>${dateLabel(r.created_at)}</small></div><p>${esc(r.reason||'Sin motivo')}</p>${r.admin_note?`<p><b>Respuesta:</b> ${esc(r.admin_note)}</p>`:''}</div>`).join('')||'<div class="empty">No tienes solicitudes.</div>'}</section>`}
+async function notifications(){const u=await currentUser();if(!u)return openLogin();const {data,error}=await sb.from('notifications').select('id,title,body,created_at,is_important').eq('is_published',true).order('is_important',{ascending:false}).order('created_at',{ascending:false});if(error)return toast(error.message);app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">NOTIFICACIONES</div><h1>Avisos</h1>${(data||[]).map(n=>`<div class="notice ${n.is_important?'important':''}"><div class="row"><b>${n.is_important?'⚠️ ':''}${esc(n.title)}</b><small>${dateLabel(n.created_at)}</small></div><p>${esc(n.body||'')}</p></div>`).join('')||'<div class="empty">No hay notificaciones.</div>'}</section>`}
+async function peoplePage(){const u=await currentUser();if(!u)return openLogin();const {data,error}=await sb.from('public_profiles').select('id,full_name,avatar_path').order('full_name');if(error)return toast(error.message);let people=await Promise.all((data||[]).map(async p=>({...p,avatar_url:p.avatar_path?await mediaUrl(p.avatar_path):''})));app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">COMUNIDAD</div><h1>Personas</h1><input id="peopleQ" placeholder="Buscar persona…" oninput="filterPeople(this.value)"><div id="peopleList" class="person-list">${people.map(personCard).join('')}</div></section>`;window.peopleCache=people}
+function personCard(p){const name=(p.full_name||'Usuario').trim()||'Usuario';return `<div class="person-card"><div class="avatar">${p.avatar_url?`<img src="${esc(p.avatar_url)}" alt="">`:name.slice(0,1).toUpperCase()}</div><div style="min-width:0;flex:1"><b>${esc(name)}</b><button class="ghost" onclick="messagesPage('${p.id}')">Mensaje</button></div></div>`}
+function filterPeople(q){q=(q||'').toLowerCase();const list=(window.peopleCache||[]).filter(p=>(p.full_name||'').toLowerCase().includes(q));document.getElementById('peopleList').innerHTML=list.map(personCard).join('')||'<p class="muted">No hay coincidencias.</p>'}
+async function messagesPage(recipientId=null){const u=await currentUser();if(!u)return openLogin();const {data:people,error:peopleError}=await sb.from('public_profiles').select('id,full_name,avatar_path').neq('id',u.id).order('full_name');if(peopleError){toast('No se han podido cargar las personas.');return}const selected=recipientId||activeMessageUser||people?.[0]?.id;activeMessageUser=selected;app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">COMUNIDAD</div><h1>Mensajes</h1><div class="message-layout"><div class="message-users">${(people||[]).map(p=>`<button class="message-user ${p.id===selected?'active':''}" onclick="messagesPage('${p.id}')"><b>${esc(p.full_name||'Usuario')}</b></button>`).join('')||'<p class="muted">No hay otras personas registradas.</p>'}</div><div class="message-pane"><div id="messagePane">Cargando…</div></div></div></section>`;await renderMessages(selected);if(messagePolling)clearInterval(messagePolling);messagePolling=setInterval(()=>renderMessages(selected,true),12000)}
+async function renderMessages(other,quiet=false){const pane=document.getElementById('messagePane');if(!pane)return;const u=await currentUser();if(!u){pane.innerHTML='<p class="muted">Inicia sesión para ver los mensajes.</p>';return}if(!other){pane.innerHTML='<p class="muted">Selecciona una persona para empezar una conversación.</p>';return}const {data,error}=await sb.from('messages').select('id,sender_id,recipient_id,body,created_at,is_read').or(`and(sender_id.eq.${u.id},recipient_id.eq.${other}),and(sender_id.eq.${other},recipient_id.eq.${u.id})`).order('created_at',{ascending:true});if(error){pane.innerHTML=`<div class="notice"><b>No se han podido cargar los mensajes.</b><p class="muted">${esc(error.message||'Error desconocido')}</p></div>`;if(!quiet)toast('No se han podido cargar los mensajes.');return}pane.innerHTML=`<div id="messages" class="messages">${(data||[]).map(m=>`<div class="bubble ${m.sender_id===u.id?'mine':''}">${esc(m.body)}<div class="small" style="opacity:.7">${dateLabel(m.created_at)}</div></div>`).join('')||'<p class="muted">Aún no hay mensajes.</p>'}</div><div class="comment-form"><input id="messageInput" placeholder="Escribe un mensaje…"><button class="cta" onclick="sendMessage('${other}')">Enviar</button></div>`;const box=document.getElementById('messages');if(box)box.scrollTop=box.scrollHeight}
+async function sendMessage(recipientId){const u=await currentUser();const input=document.getElementById('messageInput'),textV=input?.value.trim();if(!u||!textV)return;const {error}=await sb.from('messages').insert({sender_id:u.id,recipient_id:recipientId,body:textV});if(error)return toast(error.message);input.value='';renderMessages(recipientId)}
+
+async function calendarPage(){const {data,error}=await sb.from('events').select('id,title,event_date,event_time,location,description,map_url,is_published').eq('is_published',true).order('event_date',{ascending:true}).order('event_time',{ascending:true});if(error)return toast(error.message);app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">CALENDARIO</div><h1>Próximos actos</h1><div class="inline-grid">${(data||[]).map(eventCardHtml).join('')||'<div class="empty">No hay próximos actos.</div>'}</div></section>`}
+function eventCardHtml(e){return `<div class="event-card notice"><div class="chip">📅 ${esc(dateLabel(e.event_date))}${e.event_time?` · ${esc(String(e.event_time).slice(0,5))}`:''}</div><h3>${esc(e.title)}</h3>${e.location?`<p>📍 ${esc(e.location)}</p>`:''}${e.description?`<p>${esc(e.description)}</p>`:''}${e.map_url?`<a class="ghost" href="${esc(e.map_url)}" target="_blank" rel="noopener">🗺️ Cómo llegar</a>`:''}</div>`}
+async function placesPage(){const {data,error}=await sb.from('places').select('id,name,address,description,map_url').order('name');if(error)return toast(error.message);app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">LUGARES</div><h1>Lugares</h1><div class="inline-grid">${(data||[]).map(p=>`<div class="notice place-card"><h3>${esc(p.name)}</h3>${p.address?`<p>📍 ${esc(p.address)}</p>`:''}${p.description?`<p>${esc(p.description)}</p>`:''}${p.map_url?`<a class="ghost" href="${esc(p.map_url)}" target="_blank" rel="noopener">🗺️ Ver mapa</a>`:''}</div>`).join('')||'<div class="empty">No hay lugares todavía.</div>'}</div></section>`}
+async function memoriesPage(){const data=await loadMemories(50);app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">RECUERDOS</div><h1>Tal día como hoy</h1><div class="inline-grid">${(data||[]).map(m=>`<div class="notice"><b>${esc(m.title)}</b><p>Hace ${m.years} ${m.years===1?'año':'años'} · ${dateLabel(m.event_date)}</p><button class="ghost" onclick="openAlbum('${m.id}')">Ver álbum</button></div>`).join('')||'<div class="empty">No encontramos recuerdos para esta fecha.</div>'}</div></section>`}
+async function loadMemories(limit=10){const now=new Date();const mm=String(now.getMonth()+1).padStart(2,'0'),dd=String(now.getDate()).padStart(2,'0');const {data}=await sb.from('albums').select('id,title,event_date').eq('is_published',true).not('event_date','is',null);return (data||[]).filter(a=>{const s=String(a.event_date);return s.slice(5,10)===`${mm}-${dd}`&&Number(s.slice(0,4))<now.getFullYear()}).sort((a,b)=>Number(b.event_date.slice(0,4))-Number(a.event_date.slice(0,4))).slice(0,limit).map(a=>({...a,years:now.getFullYear()-Number(a.event_date.slice(0,4))}))}
+async function loadUpcomingEvents(limit=5){const today=new Date().toISOString().slice(0,10);const {data}=await sb.from('events').select('id,title,event_date,event_time,location,description,map_url').eq('is_published',true).gte('event_date',today).order('event_date',{ascending:true}).order('event_time',{ascending:true}).limit(limit);return data||[]}
+
+async function searchPage(){app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">BUSCAR</div><h1>Buscar fotos y personas</h1><input id="searchInput" class="search-box" placeholder="Álbum, fotografía o persona…" oninput="runSearch(this.value)"><div id="searchResults"></div></section>`}
+async function runSearch(q){const el=document.getElementById('searchResults');if(!el)return;q=q.trim();if(q.length<2){el.innerHTML='<p class="muted">Escribe al menos 2 caracteres.</p>';return}const {data:als}=await sb.from('albums').select('id,title,year,event_date').eq('is_published',true).ilike('title',`%${q}%`).limit(20);const {data:photos}=await sb.from('photos').select('id,storage_path,original_filename,albums(title)').eq('is_published',true).ilike('original_filename',`%${q}%`).limit(30);const {data:people}=await sb.from('public_profiles').select('id,full_name,avatar_path').ilike('full_name',`%${q}%`).limit(20);let html=`<h3>Álbumes</h3>${(als||[]).map(a=>`<button class="admin-item" onclick="openAlbum('${a.id}')"><b>${esc(a.title)}</b><span>${esc(a.year||dateLabel(a.event_date))}</span></button>`).join('')||'<p class="muted">Sin álbumes.</p>'}<h3>Personas</h3>${(people||[]).map(personCard).join('')||'<p class="muted">Sin personas.</p>'}<h3>Fotografías</h3><div class="search-results-grid">${await Promise.all((photos||[]).map(async p=>{const url=await mediaUrl(p.storage_path);return `<button class="photo" onclick="showPhoto('${esc(url)}','${esc(p.original_filename||'Fotografía')}','${p.id}',0)"><img src="${esc(url)}" alt="" loading="lazy"></button>`})).then(x=>x.join(''))||'<p class="muted">Sin fotografías.</p>'}</div>`;el.innerHTML=html}
+
+function aboutPage(){const s=siteSettings||fallbackSite;app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">INFORMACIÓN</div><h1>Sobre nosotros</h1><div class="panel"><p>${esc(s.about_text)}</p><p>Una fototeca privada para conservar y compartir los recuerdos de la comisión.</p></div></section>`}
+function contactPage(){const s=siteSettings||fallbackSite;app.innerHTML=`<section class="page"><button class="back" onclick="home()">← Inicio</button><div class="page-eyebrow">CONTACTO</div><h1>Contacto</h1><div class="panel"><p>Para consultas o solicitudes relacionadas con fotografías:</p>${s.contact_email?`<a class="cta" href="mailto:${esc(s.contact_email)}">✉️ ${esc(s.contact_email)}</a>`:'<p class="muted">El correo de contacto todavía no está configurado.</p>'}</div></section>`}
+
+async function admin(){
+  await loadTheme();app.innerHTML=`<section class="page admin"><div class="admin-head"><div><label>TARAZONA FOTOS</label><h1>Administrador</h1><p class="muted">Control completo de la web: contenido, usuarios, fotos, comentarios, solicitudes y personalización.</p></div><div class="admin-actions"><button class="ghost" onclick="goHome()">Ver web</button><button class="ghost" onclick="setThemeMode(document.documentElement.dataset.themeMode==='dark'?'light':'dark')">🌙 Tema</button><button class="danger" onclick="signOut()">Cerrar sesión</button></div></div><div class="tabs" role="tablist"><button class="active" data-admin-tab="resumen" onclick="adminTab('resumen',this)">Resumen</button><button data-admin-tab="albumes" onclick="adminTab('albumes',this)">Álbumes</button><button data-admin-tab="fotos" onclick="adminTab('fotos',this)">📷 Fotos</button><button data-admin-tab="eventos" onclick="adminTab('eventos',this)">📅 Calendario</button><button data-admin-tab="lugares" onclick="adminTab('lugares',this)">⌖ Lugares</button><button data-admin-tab="comentarios" onclick="adminTab('comentarios',this)">💬 Comentarios</button><button data-admin-tab="solicitudes" onclick="adminTab('solicitudes',this)">⚑ Solicitudes</button><button data-admin-tab="notificaciones" onclick="adminTab('notificaciones',this)">🔔 Notificaciones</button><button data-admin-tab="usuarios" onclick="adminTab('usuarios',this)">👥 Usuarios</button><button data-admin-tab="portada" onclick="adminTab('portada',this)">🖼️ Portada</button><button data-admin-tab="destacada" onclick="adminTab('destacada',this)">⭐ Destacada</button><button data-admin-tab="personalizacion" onclick="adminTab('personalizacion',this)">🎨 Personalización</button></div><div id="adminPanel"></div></section>`;adminTab('resumen',document.querySelector('.tabs button'))}
+async function adminTab(tab,btn){
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active');const p=document.getElementById('adminPanel');if(!p)return;
+  if(tab==='resumen'){const vals=await Promise.all(['albums','photos','comments','removal_requests','profiles','events'].map(count));p.innerHTML=`<div class="stats">${[['Álbumes',vals[0]],['Fotos',vals[1]],['Comentarios',vals[2]],['Solicitudes',vals[3]],['Usuarios',vals[4]],['Eventos',vals[5]]].map(x=>`<div class="panel"><b>${x[1]}</b><span>${x[0]}</span></div>`).join('')}</div><div class="panel"><h2>Almacenamiento</h2><div id="storageStats">Calculando…</div></div><div class="panel"><h2>Funciones</h2><p class="muted">Desde este panel puedes gestionar el contenido y personalizar la web sin modificar las fotografías originales.</p></div>`;loadStorageStats();return}
+  if(tab==='albumes'){const {data}=await sb.from('albums').select('*').order('year',{ascending:false}).order('event_date',{ascending:false});p.innerHTML=`<div class="panel"><h2>Crear álbum</h2><div class="admin-form"><input id="at" placeholder="Título"><input id="ay" type="number" placeholder="Año"><input id="ad" type="date"><input id="ac" placeholder="Descripción" class="full"><label><input id="ap" type="checkbox" checked> Publicado</label></div><button class="cta" onclick="createAlbum()">Crear álbum</button></div><div class="panel" id="albumList">${(data||[]).map(a=>`<div class="admin-item"><div class="admin-item-main"><b>${esc(a.title)}</b><div class="muted">${esc(a.year||'')} · ${a.is_published?'Publicado':'Borrador'}</div></div><div class="admin-actions"><button class="ghost" onclick="editAlbum('${a.id}')">✏️ Editar</button><button class="ghost" onclick="toggleAlbumPublished('${a.id}',${!a.is_published})">${a.is_published?'👁️ Ocultar':'✅ Publicar'}</button><button class="danger" onclick="deleteAlbum('${a.id}')">🗑️ Borrar</button></div></div>`).join('')||'<p class="muted">Todavía no hay álbumes.</p>'}</div>`;return}
+  if(tab==='fotos'){const {data:als}=await sb.from('albums').select('id,title').order('created_at',{ascending:false});p.innerHTML=`<div class="panel"><h2>Subir fotos</h2><select id="photoAlbum" onchange="loadAdminPhotos()">${(als||[]).map(a=>`<option value="${a.id}">${esc(a.title)}</option>`).join('')||'<option value="">Crea primero un álbum</option>'}</select><input id="photoFiles" type="file" accept="image/*" multiple><button class="cta" id="uploadBtn" onclick="uploadPhotos()">Subir fotografías</button><div id="uploadStatus" class="notice" style="display:none;margin-top:14px"></div><p class="muted">Se comprimen automáticamente (objetivo ≤ 1 MB). Puedes subir muchas a la vez.</p></div><div class="panel"><h2>Fotos del álbum</h2><div id="adminPhotoList">Selecciona un álbum…</div></div>`;loadAlbumSelect();return}
+  if(tab==='eventos'){const {data}=await sb.from('events').select('*').order('event_date',{ascending:true});p.innerHTML=`<div class="panel"><h2>Nuevo acto</h2><div class="admin-form"><input id="evTitle" placeholder="Título"><input id="evDate" type="date"><input id="evTime" type="time"><input id="evLocation" placeholder="Lugar"><input id="evMap" placeholder="Enlace Google Maps / Waze"><textarea id="evDesc" class="full" placeholder="Descripción"></textarea></div><button class="cta" onclick="createEvent()">Crear acto</button></div><div class="panel">${(data||[]).map(e=>`<div class="admin-item"><div class="admin-item-main"><b>${esc(e.title)}</b><div class="muted">${esc(dateLabel(e.event_date))} ${e.event_time?`· ${esc(String(e.event_time).slice(0,5))}`:''}</div></div><div class="admin-actions"><button class="ghost" onclick="editEvent('${e.id}')">✏️ Editar</button><button class="danger" onclick="deleteEvent('${e.id}')">Borrar</button></div></div>`).join('')||'<p class="muted">No hay actos.</p>'}</div>`;return}
+  if(tab==='lugares'){const {data}=await sb.from('places').select('*').order('name');p.innerHTML=`<div class="panel"><h2>Nuevo lugar</h2><div class="admin-form"><input id="plName" placeholder="Nombre"><input id="plAddress" placeholder="Dirección"><input id="plMap" placeholder="Enlace del mapa"><textarea id="plDesc" class="full" placeholder="Descripción"></textarea></div><button class="cta" onclick="createPlace()">Crear lugar</button></div><div class="panel">${(data||[]).map(x=>`<div class="admin-item"><div class="admin-item-main"><b>${esc(x.name)}</b><div class="muted">${esc(x.address||'')}</div></div><div class="admin-actions"><button class="ghost" onclick="editPlace('${x.id}')">✏️ Editar</button><button class="danger" onclick="deletePlace('${x.id}')">Borrar</button></div></div>`).join('')||'<p class="muted">No hay lugares.</p>'}</div>`;return}
+  if(tab==='comentarios'){const {data,error}=await sb.from('comments').select('id,body,is_visible,created_at,user_id,photo_id,photos(original_filename,albums(title))').order('created_at',{ascending:false});if(error){p.innerHTML=`<div class="notice">${esc(error.message)}</div>`;return}const ids=[...new Set((data||[]).map(c=>c.user_id).filter(Boolean))];let names={};if(ids.length){const pr=await sb.from('profiles').select('id,full_name,email').in('id',ids);names=Object.fromEntries((pr.data||[]).map(x=>[x.id,x.full_name||x.email||'Usuario']))}p.innerHTML=`<div class="panel"><h2>Comentarios</h2>${(data||[]).map(c=>`<div class="admin-item"><div class="admin-item-main"><b>👤 ${esc(names[c.user_id]||'Usuario')}</b><div>${esc(c.body)}</div><div class="muted">${c.is_visible?'Visible':'Oculto'} · ${dateLabel(c.created_at)}${c.photos?.original_filename?` · 📷 ${esc(c.photos.original_filename)}`:''}${c.photos?.albums?.title?` · Álbum: ${esc(c.photos.albums.title)}`:''}</div></div><div class="admin-actions"><button class="ghost" onclick="toggleComment('${c.id}',${!c.is_visible})">${c.is_visible?'Ocultar':'Mostrar'}</button><button class="danger" onclick="deleteComment('${c.id}')">Borrar</button></div></div>`).join('')||'<p class="muted">No hay comentarios.</p>'}</div>`;return}
+  if(tab==='solicitudes'){const {data,error}=await sb.from('removal_requests').select('id,photo_id,user_id,reason,status,admin_note,created_at,photos(original_filename,albums(title)),profiles(full_name,email)').order('created_at',{ascending:false});if(error){p.innerHTML=`<div class="notice">${esc(error.message)}</div>`;return}p.innerHTML=`<div class="panel"><h2>Solicitudes de retirada (${data?.length||0})</h2>${(data||[]).map(r=>`<div class="admin-item"><div class="admin-item-main"><b>${esc(r.profiles?.full_name||r.profiles?.email||'Usuario')}</b><div>${esc(r.reason||'Sin motivo')}</div><div class="muted">${esc(r.status||'pending')} · ${dateLabel(r.created_at)}${r.photos?.original_filename?` · 📷 ${esc(r.photos.original_filename)}`:''}${r.photos?.albums?.title?` · Álbum: ${esc(r.photos.albums.title)}`:''}</div>${r.admin_note?`<div class="muted">Respuesta: ${esc(r.admin_note)}</div>`:''}</div><div class="admin-actions"><button class="ghost" onclick="updateRemoval('${r.id}','approved')">✅ Aprobar</button><button class="ghost" onclick="updateRemoval('${r.id}','rejected')">🚫 Rechazar</button><button class="ghost" onclick="editRemovalNote('${r.id}')">📝 Nota</button><button class="danger" onclick="deleteRemoval('${r.id}')">🗑️ Borrar</button></div></div>`).join('')||'<p class="muted">No hay solicitudes.</p>'}</div>`;return}
+  if(tab==='notificaciones'){const {data}=await sb.from('notifications').select('*').order('created_at',{ascending:false});p.innerHTML=`<div class="panel"><h2>Nueva notificación</h2><div class="admin-form"><input id="nt" placeholder="Título"><textarea id="nb" class="full" placeholder="Mensaje"></textarea><label><input id="ni" type="checkbox"> ⚠️ Marcar como importante</label><label><input id="np" type="checkbox" checked> Publicada</label></div><button class="cta" onclick="createNotification()">Guardar notificación</button></div><div class="panel">${(data||[]).map(n=>`<div class="admin-item ${n.is_important?'important':''}"><div class="admin-item-main"><b>${n.is_important?'⚠️ ':''}${esc(n.title)}</b><div>${esc(n.body||'')}</div><div class="muted">${n.is_published?'Publicada':'Borrador'} · ${dateLabel(n.created_at)}</div></div><div class="admin-actions"><button class="ghost" onclick="editNotification('${n.id}')">✏️ Editar</button><button class="danger" onclick="deleteNotification('${n.id}')">Borrar</button></div></div>`).join('')||'<p class="muted">No hay notificaciones.</p>'}</div>`;return}
+  if(tab==='usuarios'){const {data}=await sb.from('profiles').select('id,full_name,email,role,created_at,avatar_path').order('created_at',{ascending:false});p.innerHTML=`<div class="panel"><h2>Usuarios (${data?.length||0})</h2>${(data||[]).map(u=>`<div class="admin-item"><div class="admin-item-main"><b>${esc(u.full_name||'Usuario')}</b><div class="muted">${esc(u.email||'')} · ${esc(u.role||'member')} · ${dateLabel(u.created_at)}</div></div><div class="admin-actions"><button class="ghost" onclick="editUser('${u.id}')">✏️ Editar</button><button class="danger" onclick="deleteUser('${u.id}')">🗑️ Eliminar</button></div></div>`).join('')||'<p class="muted">No hay usuarios.</p>'}</div>`;return}
+  if(tab==='portada'){const s=siteSettings||await loadSettings();const cover=s.cover_path?await mediaUrl(s.cover_path):'tarazona-header.jpg';p.innerHTML=`<div class="panel"><h2>Foto de portada</h2><div class="cover-admin"><img src="${esc(cover)}" alt="Portada actual"><div><p>Administra la imagen de cabecera desde aquí. La fotografía original no se modifica.</p><input type="file" id="coverFile" accept="image/*"><div class="admin-actions"><button class="cta" onclick="uploadCover()">🖼️ Cambiar portada</button><button class="ghost" onclick="restoreCover()">↩️ Restaurar original</button></div></div></div></div>`;return}
+  if(tab==='destacada'){const {data:als}=await sb.from('albums').select('id,title').eq('is_published',true).order('year',{ascending:false});p.innerHTML=`<div class="panel"><h2>Foto destacada</h2><select id="featuredAlbum" onchange="loadFeaturedPhotos()"><option value="">Selecciona álbum…</option>${(als||[]).map(a=>`<option value="${a.id}">${esc(a.title)}</option>`).join('')}</select><div id="featuredPhotos" class="search-results-grid"></div><input id="featuredTitle" placeholder="Título de la destacada"><textarea id="featuredText" placeholder="Texto que aparecerá junto a la foto"></textarea><button class="cta" onclick="saveFeaturedText()">Guardar texto</button></div>`;setFeaturedTextDefaults();return}
+  if(tab==='personalizacion'){const s=siteSettings||await loadSettings();p.innerHTML=`<div class="panel"><h2>Personalización de la web</h2><div class="admin-form"><input id="siteName" value="${esc(s.site_name||'Tarazona Fotos')}" placeholder="Nombre de la web"><input id="accentColor" value="${esc(s.accent_color||'#08bfc0')}" type="color"><input id="heroTitle" value="${esc(s.hero_title||'')}" class="full" placeholder="Título principal"><textarea id="heroSubtitle" class="full" placeholder="Texto principal">${esc(s.hero_subtitle||'')}</textarea><textarea id="welcomeText" class="full" placeholder="Mensaje destacado">${esc(s.welcome_text||'')}</textarea><textarea id="aboutText" class="full" placeholder="Sobre nosotros">${esc(s.about_text||'')}</textarea><input id="contactEmail" value="${esc(s.contact_email||'')}" placeholder="Correo de contacto"><input id="whatsappNumber" value="${esc(s.whatsapp_number||'')}" placeholder="WhatsApp de contacto (opcional)"><select id="defaultTheme"><option value="auto"${s.default_theme==='auto'?' selected':''}>Tema automático</option><option value="light"${s.default_theme==='light'?' selected':''}>Tema claro</option><option value="dark"${s.default_theme==='dark'?' selected':''}>Tema oscuro</option></select><input id="footerText" value="${esc(s.footer_text||'')}" placeholder="Texto del pie de página"></div><button class="cta" onclick="saveSiteSettings()">Guardar personalización</button></div>`;return}
+}
+async function count(t){const {count,error}=await sb.from(t).select('*',{count:'exact',head:true});return error?'—':count||0}
+async function loadStorageStats(){const el=document.getElementById('storageStats');if(!el)return;try{const {data}=await sb.functions.invoke('dropbox-media?action=stats',{body:{}});if(data?.albums?.length){el.innerHTML=`<p><b>${formatBytes(data.total_bytes||0)}</b> de almacenamiento utilizado</p>${data.albums.map(a=>`<div class="admin-item"><span>${esc(a.title)} <small>${Number(a.photos||0)} fotos</small></span><b>${formatBytes(a.bytes||0)}</b></div>`).join('')}`;return}}catch(e){el.innerHTML='<p class="muted">No se ha podido consultar el almacenamiento ahora mismo.</p>'}}
+async function createAlbum(){const u=await currentUser();const payload={title:document.getElementById('at').value.trim(),year:Number(document.getElementById('ay').value)||null,event_date:document.getElementById('ad').value||null,description:document.getElementById('ac').value.trim()||null,is_published:document.getElementById('ap').checked};try{await adminCall('create-album',{...payload,created_by:u.id});toast('Álbum creado.');adminTabRefresh('albumes')}catch(e){toast(e.message)}}
+async function editAlbum(id){const {data:a}=await sb.from('albums').select('*').eq('id',id).maybeSingle();if(!a)return;body.innerHTML=`<div class="modal-head"><h2>Editar álbum</h2></div><div class="admin-form"><input id="eat" value="${esc(a.title||'')}"><input id="eay" type="number" value="${esc(a.year||'')}"><input id="ead" type="date" value="${esc(a.event_date||'')}"><textarea id="eac" class="full">${esc(a.description||'')}</textarea><label><input id="eap" type="checkbox" ${a.is_published?'checked':''}> Publicado</label></div><button class="cta full" onclick="saveAlbum('${id}')">Guardar</button>`;modal.classList.remove('hide')}
+async function toggleAlbumPublished(id,value){try{await adminCall('update-album',{id,is_published:value});toast(value?'Álbum publicado.':'Álbum oculto.');await adminTabRefresh('albumes')}catch(e){toast(e.message)}}
+async function saveAlbum(id){try{await adminCall('update-album',{id,title:document.getElementById('eat').value.trim(),year:Number(document.getElementById('eay').value)||null,event_date:document.getElementById('ead').value||null,description:document.getElementById('eac').value.trim()||null,is_published:document.getElementById('eap').checked});closeM();toast('Álbum actualizado.');adminTabRefresh('albumes')}catch(e){toast(e.message)}}
+async function deleteAlbum(id){if(!confirm('¿Borrar este álbum y sus fotografías?'))return;try{const {data:photos}=await sb.from('photos').select('storage_path').eq('album_id',id);for(const p of photos||[]){const storageError=await deleteMedia(p.storage_path);if(storageError)throw storageError;}await adminCall('delete-album',{id});toast('Álbum borrado.');adminTabRefresh('albumes')}catch(e){toast(e.message)}}
+async function loadAlbumSelect(){const {data}=await sb.from('albums').select('id,title').order('created_at',{ascending:false});const s=document.getElementById('photoAlbum');if(s)s.innerHTML=(data||[]).map(a=>`<option value="${a.id}">${esc(a.title)}</option>`).join('')||'<option value="">Crea primero un álbum</option>';await loadAdminPhotos()}
+async function loadAdminPhotos(){const albumId=document.getElementById('photoAlbum')?.value,el=document.getElementById('adminPhotoList');if(!el)return;if(!albumId){el.innerHTML='<p class="muted">Selecciona un álbum…</p>';return}const {data,error}=await sb.from('photos').select('id,storage_path,original_filename,created_at,is_published').eq('album_id',albumId).order('created_at',{ascending:false});if(error){el.innerHTML=`<p>${esc(error.message)}</p>`;return}if(!data?.length){el.innerHTML='<p class="muted">Este álbum todavía no tiene fotografías.</p>';return}let html='<div class="bulk-actions"><label class="select-all"><input type="checkbox" id="selectAllPhotos" onchange="toggleAllPhotos(this.checked)"> Seleccionar todas</label><button class="danger" id="deleteSelectedBtn" onclick="deleteSelectedPhotos()" disabled>🗑️ Borrar seleccionadas (0)</button></div>';for(const p of data){const u=await mediaUrl(p.storage_path);html+=`<div class="admin-item"><label class="photo-check" style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="photoSelect" value="${p.id}" data-path="${esc(p.storage_path)}" onchange="updateSelectedCount()"><img src="${esc(u)}" style="width:76px;height:76px;object-fit:cover;border-radius:10px" alt=""></label><div class="admin-item-main"><b>${esc(p.original_filename||'Fotografía')}</b><div class="muted">Tamaño no disponible · ${p.is_published?'Publicada':'Oculta'}</div></div><div class="admin-actions"><button class="ghost" onclick="editPhoto('${p.id}')">✏️</button><button class="ghost" onclick="setFeatured('${p.id}')">⭐</button><button class="danger" onclick="deletePhoto('${p.id}','${esc(p.storage_path)}')">Borrar</button></div></div>`}el.innerHTML=html;updateSelectedCount()}
+function getSelectedPhotos(){return [...document.querySelectorAll('.photoSelect:checked')].map(x=>({id:x.value,path:x.dataset.path}))}
+function toggleAllPhotos(checked){document.querySelectorAll('.photoSelect').forEach(x=>x.checked=checked);updateSelectedCount()}
+function updateSelectedCount(){const n=document.querySelectorAll('.photoSelect:checked').length,b=document.getElementById('deleteSelectedBtn');if(b){b.disabled=n===0;b.textContent=`🗑️ Borrar seleccionadas (${n})`}}
+async function deletePhoto(id,path){if(!confirm('¿Seguro que quieres borrar esta fotografía?'))return;try{const storageError=await deleteMedia(path);if(storageError)throw storageError;await adminCall('delete-photo',{id});toast('Fotografía borrada.');loadAdminPhotos()}catch(e){toast(e.message)}}
+async function deleteSelectedPhotos(){const selected=getSelectedPhotos();if(!selected.length)return;if(!confirm(`¿Seguro que quieres borrar ${selected.length} fotografías?`))return;try{for(const it of selected){const storageError=await deleteMedia(it.path);if(storageError)throw storageError;}await adminCall('delete-photos',{items:selected.map(x=>({id:x.id,path:x.path}))});toast(`${selected.length} fotografías borradas.`);loadAdminPhotos()}catch(e){toast(e.message)}}
+async function editPhoto(id){const {data:p}=await sb.from('photos').select('caption,is_published,original_filename').eq('id',id).maybeSingle();if(!p)return;body.innerHTML=`<div class="modal-head"><h2>Editar fotografía</h2></div><textarea id="pcap" placeholder="Pie de foto">${esc(p.caption||'')}</textarea><label><input id="ppub" type="checkbox" ${p.is_published?'checked':''}> Publicada</label><button class="cta full" onclick="savePhoto('${id}')">Guardar</button>`;modal.classList.remove('hide')}
+async function savePhoto(id){try{await adminCall('update-photo',{id,caption:document.getElementById('pcap').value.trim()||null,is_published:document.getElementById('ppub').checked});closeM();toast('Fotografía actualizada.');loadAdminPhotos()}catch(e){toast(e.message)}}
+async function uploadPhotos(){const albumId=document.getElementById('photoAlbum').value,files=[...document.getElementById('photoFiles').files],status=document.getElementById('uploadStatus'),btn=document.getElementById('uploadBtn');if(!albumId||!files.length)return toast('Selecciona un álbum y al menos una fotografía.');const u=await currentUser();if(!u)return openLogin();btn.disabled=true;status.style.display='block';status.textContent=`Preparando ${files.length} fotografías…`;let ok=0;for(let i=0;i<files.length;i++){const original=files[i];try{const f=await compressPhoto(original);const safeName=f.name.replace(/[^a-zA-Z0-9._-]/g,'_');const path=`${albumId}/${crypto.randomUUID()}-${safeName}`;status.textContent=`Subiendo ${i+1} de ${files.length}: ${original.name}`;const form=new FormData();form.append('albumId',albumId);form.append('originalName',original.name);form.append('file',f,f.name);const headers=await functionAuthHeaders();if(!headers)throw new Error('La sesión ha caducado.');const {data:up,error:upError}=await sb.functions.invoke('dropbox-media?action=upload',{body:form,headers});if(upError)throw upError;if(up?.error)throw new Error(up.error);const ins=await sb.from('photos').insert({album_id:albumId,storage_path:up.storage_path,original_filename:original.name,uploaded_by:u.id});if(ins.error)throw ins.error;ok++}catch(e){toast(`Error en ${original.name}: ${e.message||e}`);break}}status.textContent=`✓ ${ok} de ${files.length} fotografías subidas.`;btn.disabled=false;if(ok===files.length)document.getElementById('photoFiles').value='';loadAdminPhotos()}
+async function compressPhoto(file){if(!file.type.startsWith('image/'))return file;const MAX_BYTES=1024*1024;if(file.size<=MAX_BYTES)return file;const bitmap=await createImageBitmap(file,{imageOrientation:'from-image'}).catch(()=>createImageBitmap(file));let width=bitmap.width,height=bitmap.height;const maxDimension=2400;if(Math.max(width,height)>maxDimension){const s=maxDimension/Math.max(width,height);width=Math.round(width*s);height=Math.round(height*s)}const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{alpha:false});const makeBlob=(w,h,q)=>new Promise((res,rej)=>{canvas.width=w;canvas.height=h;ctx.clearRect(0,0,w,h);ctx.drawImage(bitmap,0,0,w,h);canvas.toBlob(b=>b?res(b):rej(new Error('No se pudo comprimir la imagen')),'image/jpeg',q)});let blob=null;for(const q of [.84,.78,.72,.66,.60,.55,.50]){blob=await makeBlob(width,height,q);if(blob.size<=MAX_BYTES)break}while(blob&&blob.size>MAX_BYTES&&Math.max(width,height)>1600){width=Math.round(width*.85);height=Math.round(height*.85);blob=await makeBlob(width,height,.72)}bitmap.close?.();if(!blob)throw new Error('No se pudo preparar la fotografía');const base=file.name.replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9._-]/g,'_');return new File([blob],`${base}.jpg`,{type:'image/jpeg',lastModified:Date.now()})}
+async function createEvent(){try{const u=await currentUser();await adminCall('create-event',{created_by:u.id,title:document.getElementById('evTitle').value.trim(),event_date:document.getElementById('evDate').value,event_time:document.getElementById('evTime').value||null,location:document.getElementById('evLocation').value.trim()||null,map_url:document.getElementById('evMap').value.trim()||null,description:document.getElementById('evDesc').value.trim()||null,is_published:true});toast('Acto creado.');adminTabRefresh('eventos')}catch(e){toast(e.message)}}
+async function editEvent(id){const {data:e}=await sb.from('events').select('*').eq('id',id).maybeSingle();if(!e)return;body.innerHTML=`<div class="modal-head"><h2>Editar acto</h2></div><div class="admin-form"><input id="eet" value="${esc(e.title||'')}"><input id="eed" type="date" value="${esc(e.event_date||'')}"><input id="eetm" type="time" value="${esc(String(e.event_time||'').slice(0,5))}"><input id="eel" value="${esc(e.location||'')}"><input id="eem" class="full" value="${esc(e.map_url||'')}"><textarea id="eedesc" class="full">${esc(e.description||'')}</textarea></div><button class="cta full" onclick="saveEvent('${id}')">Guardar</button>`;modal.classList.remove('hide')}
+async function saveEvent(id){try{await adminCall('update-event',{id,title:document.getElementById('eet').value.trim(),event_date:document.getElementById('eed').value,event_time:document.getElementById('eetm').value||null,location:document.getElementById('eel').value.trim()||null,map_url:document.getElementById('eem').value.trim()||null,description:document.getElementById('eedesc').value.trim()||null});closeM();toast('Acto actualizado.');adminTabRefresh('eventos')}catch(e){toast(e.message)}}
+async function deleteEvent(id){if(!confirm('¿Borrar este acto?'))return;try{await adminCall('delete-event',{id});toast('Acto borrado.');adminTabRefresh('eventos')}catch(e){toast(e.message)}}
+async function createPlace(){try{const u=await currentUser();await adminCall('create-place',{created_by:u.id,name:document.getElementById('plName').value.trim(),address:document.getElementById('plAddress').value.trim()||null,map_url:document.getElementById('plMap').value.trim()||null,description:document.getElementById('plDesc').value.trim()||null});toast('Lugar creado.');adminTabRefresh('lugares')}catch(e){toast(e.message)}}
+async function editPlace(id){const {data:p}=await sb.from('places').select('*').eq('id',id).maybeSingle();if(!p)return;body.innerHTML=`<div class="modal-head"><h2>Editar lugar</h2></div><div class="admin-form"><input id="epn" value="${esc(p.name||'')}"><input id="epa" value="${esc(p.address||'')}"><input id="epm" class="full" value="${esc(p.map_url||'')}"><textarea id="epd" class="full">${esc(p.description||'')}</textarea></div><button class="cta full" onclick="savePlace('${id}')">Guardar</button>`;modal.classList.remove('hide')}
+async function savePlace(id){try{await adminCall('update-place',{id,name:document.getElementById('epn').value.trim(),address:document.getElementById('epa').value.trim()||null,map_url:document.getElementById('epm').value.trim()||null,description:document.getElementById('epd').value.trim()||null});closeM();toast('Lugar actualizado.');adminTabRefresh('lugares')}catch(e){toast(e.message)}}
+async function deletePlace(id){if(!confirm('¿Borrar este lugar?'))return;try{await adminCall('delete-place',{id});toast('Lugar borrado.');adminTabRefresh('lugares')}catch(e){toast(e.message)}}
+async function toggleComment(id,value){try{await adminCall('update-comment',{id,is_visible:value});adminTabRefresh('comentarios')}catch(e){toast(e.message)}}
+async function deleteComment(id){if(!confirm('¿Borrar este comentario?'))return;try{await adminCall('delete-comment',{id});toast('Comentario borrado.');adminTabRefresh('comentarios')}catch(e){toast(e.message)}}
+async function updateRemoval(id,status){try{await adminCall('update-removal',{id,status});toast('Solicitud actualizada.');await adminTabRefresh('solicitudes')}catch(e){toast(e.message)}}
+async function editRemovalNote(id){const {data:r}=await sb.from('removal_requests').select('admin_note').eq('id',id).maybeSingle();if(!r)return;body.innerHTML=`<div class="modal-head"><h2>Nota de administración</h2></div><textarea id="remNote" placeholder="Respuesta para el usuario">${esc(r.admin_note||'')}</textarea><button class="cta full" onclick="saveRemovalNote('${id}')">Guardar nota</button>`;modal.classList.remove('hide')}
+async function saveRemovalNote(id){try{await adminCall('update-removal',{id,admin_note:document.getElementById('remNote').value.trim()||null});closeM();toast('Nota guardada.');await adminTabRefresh('solicitudes')}catch(e){toast(e.message)}}
+async function deleteRemoval(id){if(!confirm('¿Borrar esta solicitud?'))return;try{await adminCall('delete-removal',{id});toast('Solicitud borrada.');await adminTabRefresh('solicitudes')}catch(e){toast(e.message)}}
+async function createNotification(){try{const u=await currentUser();await adminCall('create-notification',{title:document.getElementById('nt').value.trim(),body:document.getElementById('nb').value.trim()||null,is_important:document.getElementById('ni').checked,is_published:document.getElementById('np').checked,created_by:u.id});toast('Notificación guardada.');adminTabRefresh('notificaciones')}catch(e){toast(e.message)}}
+async function editNotification(id){const {data:n}=await sb.from('notifications').select('*').eq('id',id).maybeSingle();if(!n)return;body.innerHTML=`<div class="modal-head"><h2>Editar notificación</h2></div><input id="ent" value="${esc(n.title||'')}"><textarea id="enb">${esc(n.body||'')}</textarea><label><input id="eni" type="checkbox" ${n.is_important?'checked':''}> Importante</label><label><input id="enp" type="checkbox" ${n.is_published?'checked':''}> Publicada</label><button class="cta full" onclick="saveNotification('${id}')">Guardar</button>`;modal.classList.remove('hide')}
+async function saveNotification(id){try{await adminCall('update-notification',{id,title:document.getElementById('ent').value.trim(),body:document.getElementById('enb').value.trim()||null,is_important:document.getElementById('eni').checked,is_published:document.getElementById('enp').checked});closeM();toast('Notificación actualizada.');adminTabRefresh('notificaciones')}catch(e){toast(e.message)}}
+async function deleteNotification(id){if(!confirm('¿Borrar esta notificación?'))return;try{await adminCall('delete-notification',{id});toast('Notificación borrada.');adminTabRefresh('notificaciones')}catch(e){toast(e.message)}}
+async function editUser(id){const {data:u}=await sb.from('profiles').select('*').eq('id',id).maybeSingle();if(!u)return;body.innerHTML=`<div class="modal-head"><h2>Editar usuario</h2></div><input id="uen" value="${esc(u.full_name||'')}" placeholder="Nombre"><input id="uee" value="${esc(u.email||'')}" type="email" placeholder="Correo"><select id="uer"><option value="member"${u.role==='member'?' selected':''}>Usuario</option><option value="admin"${u.role==='admin'?' selected':''}>Administrador</option></select><button class="cta full" onclick="saveUser('${id}')">Guardar</button>`;modal.classList.remove('hide')}
+async function saveUser(id){try{await adminCall('update-user',{id,full_name:document.getElementById('uen').value.trim()||null,email:document.getElementById('uee').value.trim(),role:document.getElementById('uer').value});closeM();toast('Usuario actualizado.');adminTabRefresh('usuarios')}catch(e){toast(e.message)}}
+async function deleteUser(id){const me=await currentUser();if(me?.id===id)return toast('No puedes eliminar tu propia cuenta desde aquí.');if(!confirm('Esto eliminará la cuenta de acceso, perfil, comentarios, favoritos y mensajes del usuario. ¿Continuar?'))return;try{await adminCall('delete-user',{id});toast('Usuario eliminado completamente.');adminTabRefresh('usuarios')}catch(e){toast(e.message)}}
+async function uploadCover(){const f=document.getElementById('coverFile')?.files?.[0];if(!f)return toast('Selecciona una imagen.');try{await adminCall('upload-cover',{},f);toast('Portada actualizada.');await loadSettings();adminTabRefresh('portada')}catch(e){toast(e.message)}}
+async function restoreCover(){try{await adminCall('restore-cover');toast('Se ha restaurado la portada original.');await loadSettings();adminTabRefresh('portada')}catch(e){toast(e.message)}}
+async function loadFeaturedPhotos(){const id=document.getElementById('featuredAlbum')?.value,el=document.getElementById('featuredPhotos');if(!el||!id){if(el)el.innerHTML='';return}const {data:ps}=await sb.from('photos').select('id,storage_path,original_filename').eq('album_id',id).eq('is_published',true).limit(100);el.innerHTML=await Promise.all((ps||[]).map(async p=>{const url=await mediaUrl(p.storage_path);return `<button class="photo" onclick="pickFeatured('${p.id}')"><img src="${esc(url)}" alt="${esc(p.original_filename||'')}" loading="lazy"></button>`})).then(x=>x.join(''))}
+async function pickFeatured(id){try{await adminCall('set-featured',{photo_id:id});toast('Foto destacada seleccionada.');adminTabRefresh('destacada')}catch(e){toast(e.message)}}
+async function setFeatured(id){await pickFeatured(id)}
+async function saveFeaturedText(){try{await adminCall('save-settings',{featured_title:document.getElementById('featuredTitle').value.trim()||null,featured_text:document.getElementById('featuredText').value.trim()||null});toast('Texto de la destacada guardado.')}catch(e){toast(e.message)}}
+async function saveSiteSettings(){try{await adminCall('save-settings',{site_name:document.getElementById('siteName').value.trim()||'Tarazona Fotos',accent_color:document.getElementById('accentColor').value,hero_title:document.getElementById('heroTitle').value.trim(),hero_subtitle:document.getElementById('heroSubtitle').value.trim(),welcome_text:document.getElementById('welcomeText').value.trim(),about_text:document.getElementById('aboutText').value.trim(),contact_email:document.getElementById('contactEmail').value.trim()||null,whatsapp_number:document.getElementById('whatsappNumber').value.trim()||null,default_theme:document.getElementById('defaultTheme').value,footer_text:document.getElementById('footerText').value.trim()||null});toast('Personalización guardada.');await loadSettings();adminTabRefresh('personalizacion')}catch(e){toast(e.message)}}
+async function setFeaturedTextDefaults(){const s=await loadSettings();const a=document.getElementById('featuredTitle'),b=document.getElementById('featuredText');if(a)a.value=s.featured_title||'';if(b)b.value=s.featured_text||''}
+async function editPhotoPlaceholder(){}
+async function requestRemoval(id){body.innerHTML=`<div class="modal-head"><h2>Solicitar retirada</h2></div><p>Indica por qué quieres solicitar que esta fotografía sea retirada.</p><textarea id="remReason" placeholder="Motivo"></textarea><button class="cta full" onclick="submitRemoval('${id}')">Enviar solicitud</button>`;modal.classList.remove('hide')}
+async function submitRemoval(photoId){const u=await currentUser();if(!u)return openLogin();const reason=document.getElementById('remReason').value.trim();if(!reason)return toast('Escribe un motivo.');const {error}=await sb.from('removal_requests').insert({photo_id:photoId,user_id:u.id,reason,status:'pending'});if(error)return toast(error.message);closeM();toast('Solicitud enviada.')}
+function openLoginOrShare(){}
+function removeNetlifyBadge(){const selectors=['#netlify-badge','.netlify-badge','[data-netlify-badge]'];selectors.forEach(sel=>document.querySelectorAll(sel).forEach(el=>{try{el.remove()}catch(e){}}))}new MutationObserver(removeNetlifyBadge).observe(document.documentElement,{childList:true,subtree:true});removeNetlifyBadge();
+
+async function setupSwipe(){let sx=null,sy=null;modal.addEventListener('touchstart',e=>{sx=e.changedTouches[0].clientX;sy=e.changedTouches[0].clientY},{passive:true});modal.addEventListener('touchend',e=>{if(sx===null)return;const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)){moveViewer(dx<0?1:-1)}sx=sy=null},{passive:true})}
+
+const realObserver=new MutationObserver(()=>{});
+setupSwipe();
+
+/* V1.6 — navegación con botón Atrás del móvil.
+   La web es una SPA: las pantallas cambian sin cargar otra URL. Por eso
+   el historial del navegador se rellena manualmente para que Atrás vuelva
+   a la pantalla anterior en vez de sacar al usuario de la web. */
+(function setupBrowserBackNavigation(){
+  const routeNames=['home','albums','openAlbum','accountRoute','favorites','downloads','myPhotosPage','myCommentsPage','requestsPage','notifications','peoplePage','messagesPage','calendarPage','placesPage','memoriesPage','searchPage','aboutPage','contactPage','admin'];
+  const originals={};
+  let restoring=false;
+  let started=false;
+
+  routeNames.forEach(name=>{
+    if(typeof window[name]!=='function') return;
+    originals[name]=window[name];
+    window[name]=function(...args){
+      if(!restoring && started){
+        const state={tfRoute:name,tfArgs:args};
+        history.pushState(state,'','');
+      }
+      return originals[name].apply(this,args);
+    };
+  });
+
+  history.replaceState({tfRoute:'home',tfArgs:[]},'',location.href);
+  started=true;
+
+  // Navegación de Inicio explícita para móvil: no depende de que el botón del navegador
+  // tenga historial previo y fuerza el render de la pantalla inicial.
+  window.goHome=function(){
+    closeSide();
+    try{history.replaceState({tfRoute:'home',tfArgs:[]},'',location.href.split('#')[0])}catch(e){}
+    try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){window.scrollTo(0,0)}
+    return originals.home.apply(window,[]);
+  };
+
+  window.addEventListener('popstate',function(e){
+    closeSide();
+    if(!e.state || !e.state.tfRoute){
+      return;
+    }
+    const fn=originals[e.state.tfRoute];
+    if(typeof fn!=='function') return;
+    restoring=true;
+    Promise.resolve(fn.apply(window,e.state.tfArgs||[])).finally(()=>{restoring=false;});
+  });
+})();
+
+const tfParams=new URLSearchParams(location.search);
+window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',()=>loadTheme());
+if(tfParams.get('userId')&&tfParams.get('secret')){setTimeout(()=>openNewPassword(),120);} else {loadTheme().then(()=>home());}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.classList.contains('hide'))closeM();if(e.key==='ArrowLeft'&&!modal.classList.contains('hide'))moveViewer(-1);if(e.key==='ArrowRight'&&!modal.classList.contains('hide'))moveViewer(1)});
+</script>
+</body>
+</html>
